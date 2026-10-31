@@ -20,12 +20,12 @@
 *{box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
-.wrap{max-width:1040px;margin:0 auto;display:grid;gap:28px}
+.wrap{max-width:1200px;margin:0 auto;display:grid;gap:28px}
 header{display:grid;gap:10px;border-bottom:3px solid var(--rule-strong);padding-bottom:16px}
 .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,8vw,76px);line-height:.9;margin:0;letter-spacing:.01em;text-transform:uppercase}
 h1 span{color:var(--pylon)}
-.sub{color:var(--muted);max-width:68ch;margin:0}
+.sub{color:var(--muted);max-width:none;margin:0}
 .meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:12.5px}
 .meta b{font-weight:600}
 h2{font-family:var(--display);font-weight:800;font-size:28px;text-transform:uppercase;letter-spacing:.02em;margin:0;line-height:1}
@@ -35,18 +35,19 @@ h2{font-family:var(--display);font-weight:800;font-size:28px;text-transform:uppe
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--sheet)}
 .seg button:focus-visible,.trow:focus-visible,summary:focus-visible,input:focus-visible,.reset:focus-visible{outline:2px solid var(--pylon);outline-offset:2px}
 .tablebox{overflow-x:auto;background:var(--sheet);border:1px solid var(--rule)}
-table{border-collapse:collapse;width:100%;min-width:980px;font-variant-numeric:tabular-nums}
-th{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:10px 8px;border-bottom:1.5px solid var(--rule-strong);white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+@media (max-width:860px){table{min-width:820px}}
+th{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.03em;line-height:1.25;color:var(--muted);text-align:right;vertical-align:bottom;padding:9px 5px;border-bottom:1.5px solid var(--rule-strong)}
 th.l,td.l{text-align:left}
-td{padding:9px 8px;border-bottom:1px solid var(--rule);text-align:right;font-family:var(--mono);font-size:13.5px;white-space:nowrap}
+td{padding:8px 5px;border-bottom:1px solid var(--rule);text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
 tr.trow{cursor:pointer}
 tr.trow:hover td{background:var(--turf-soft)}
-.rk{font-family:var(--display);font-weight:900;font-size:26px;line-height:1;width:44px;text-align:center;color:var(--ink)}
+.rk{font-family:var(--display);font-weight:900;font-size:22px;line-height:1;width:36px;text-align:center;color:var(--ink)}
 tr.top4 .rk{color:var(--pylon)}
-.team{font-family:var(--body);font-size:15.5px;font-weight:700}
-.chip{display:inline-block;font:500 10.5px var(--mono);letter-spacing:.04em;background:var(--chip);color:var(--muted);padding:2px 6px;border-radius:3px;margin-left:8px;vertical-align:2px}
+.team{font-family:var(--body);font-size:14.5px;font-weight:700}
+.chip{display:inline-block;font:500 9.5px var(--mono);letter-spacing:.03em;background:var(--chip);color:var(--muted);padding:1px 4px;border-radius:3px;margin-left:6px;vertical-align:2px}
 .rec{font-weight:600}
-.mv{font-weight:600;font-size:12.5px;width:46px}
+.mv{font-weight:600;font-size:11.5px;width:38px}
 .mv.up{color:var(--up)} .mv.dn{color:var(--down)} .mv.eq{color:var(--muted)} .mv.new{color:var(--pylon)}
 .nr{color:var(--muted)}
 .score{font-weight:600}
@@ -60,11 +61,11 @@ tr.detail td{background:var(--turf-soft);white-space:normal;text-align:left;padd
 .log .orank{color:var(--muted)}
 .log .ln{color:var(--muted);min-width:42px;text-align:right}
 td.pos{color:var(--up)} td.neg{color:var(--down)}
-th.fx span,th.tot span{display:block;font-size:10.5px;color:var(--pylon);margin-top:2px;letter-spacing:.02em}
+th.fx span,th.tot span{display:block;font-size:10px;color:var(--pylon);margin-top:2px;letter-spacing:.02em}
 td.fx{color:var(--muted)}
 th.fx:first-of-type,td.fx{border-left:0}
 th.tot,td.tot{border-left:1.5px solid var(--rule-strong);padding-left:10px}
-td.tot{font-size:14.5px}
+td.tot{font-size:13.5px}
 sup.fcs{color:var(--pylon);font-size:11px;margin-left:1px}
 .fcsrow{border-top:1px solid var(--rule);padding-top:10px}
 .compline{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:8px}

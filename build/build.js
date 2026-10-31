@@ -149,7 +149,7 @@ function render(D) {
   if (/__[A-Z]+__/.test(page)) throw new Error('Unfilled placeholder: ' + page.match(/__[A-Z]+__/)[0]);
   const cut = page.indexOf('</style>') + '</style>'.length;
   const head = '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n' +
-    '<meta name="description" content="Gridiron Index: a college football FBS Top 25 adjusted for strength of schedule, yards per play, conference strength and performance against the spread.">\n' +
+    '<meta name="description" content="Bob\'s Top 25: a college football FBS Top 25 adjusted for strength of schedule, yards per play, conference strength and performance against the spread.">\n' +
     '<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>\n';
   const index = head + page.slice(0, cut).replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '') + '\n</head>\n<body>\n' + page.slice(cut) + '\n</body>\n</html>\n';
   fs.writeFileSync(path.join(ROOT, 'index.html'), index);

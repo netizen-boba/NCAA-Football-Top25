@@ -61,6 +61,11 @@ tr.detail td{background:var(--turf-soft);white-space:normal;text-align:left;padd
 .log .orank{color:var(--muted)}
 .log .ln{color:var(--muted);min-width:42px;text-align:right}
 td.pos{color:var(--up)} td.neg{color:var(--down)}
+.sortable button{all:unset;cursor:pointer;display:block;width:100%;text-align:inherit;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit}
+.sortable button:hover{color:var(--ink)}
+.sortable button:focus-visible{outline:2px solid var(--pylon);outline-offset:2px}
+th.sorted{color:var(--ink)}
+th .arr{font-style:normal;font-size:9px;margin-left:2px;color:var(--pylon)}
 th.fx span,th.tot span{display:block;font-size:10px;color:var(--pylon);margin-top:2px;letter-spacing:.02em}
 td.fx{color:var(--muted)}
 th.fx:first-of-type,td.fx{border-left:0}
@@ -184,23 +189,45 @@ function gameLog(t,cur){
     const m=r.pf-r.pa+r.ln, lt=r.ln===0?'PK':(r.ln>0?'+':'')+r.ln;
     return `<div><span class="${win?'w':'L'}">${win?'W':'L'}</span><span class="o">${r.neu?'vs ':r.home?'':'@ '}${on} <span class="orank">${or}</span></span><span>${r.pf}-${r.pa}</span><span class="ln">${lt}</span><span class="${m>0?'w':m<0?'L':'orank'}">${m>0?'+':''}${m}</span></div>`}).join('');
 }
+let sortCol='rk', sortDir=1; // 1 = the column's natural order, -1 = reversed
+function columns(key,wn,prev){
+  const pr=r=>prev[r.t][key];
+  const c=(id,head,dir,val,cell,cls='')=>({id,head,dir,val,cell,cls});
+  const cols=[
+    c('rk','Rk','asc',r=>r[key],r=>`<td class="rk">${r[key]}</td>`),
+    c('mv','Δ','desc',r=>pr(r)-r[key],r=>mvCell(r[key],pr(r)),'l'),
+    c('team','Team','asc',r=>r.name,r=>`<td class="l"><span class="team">${r.name}</span><span class="chip">${r.conf}</span></td>`,'l'),
+    c('wl','W-L','desc',r=>r.rawWP*100+r.w,r=>`<td class="rec">${r.w}-${r.l}${r.fcsW?`<sup class="fcs" title="Includes ${r.fcsW} win over FCS">*</sup>`:''}</td>`),
+    c('prev','Prev','asc',r=>pr(r),r=>`<td class="${pr(r)>25?'nr':''}">${pr(r)}</td>`),
+  ];
+  if(view==='adj'){
+    cols.push(c('sos','SOS rk','asc',r=>r.sosRank,r=>`<td>${r.sosRank}</td>`));
+    cols.push(c('ats','ATS','desc',r=>{const a=r.atsRec;return (a.c+a.p/2)/Math.max(1,a.c+a.x+a.p)*100+a.avg/100;},r=>{const a=r.atsRec;return `<td>${a.c}-${a.x}${a.p?'-'+a.p:''}</td>`;}));
+    for(const [k,lab,v] of FACTORS) cols.push(c(k,`${lab}<span>${Math.round(wn[k]*100)}%</span>`,'desc',r=>wn[k]*r[v],r=>`<td class="fx">${(wn[k]*r[v]*100).toFixed(1)}</td>`,'fx'));
+    cols.push(c('score','Score<span>of 100</span>','desc',r=>r.score,r=>`<td class="score tot">${(r.score*100).toFixed(1)}</td>`,'tot'));
+  } else {
+    cols.push(c('adjrk','Adj. rk','asc',r=>r.rank,r=>`<td>${r.rank}</td>`));
+    cols.push(c('sos','SOS rk','asc',r=>r.sosRank,r=>`<td>${r.sosRank}</td>`));
+    cols.push(c('owp','OWP','desc',r=>r.owp,r=>`<td class="hide-sm">${pct(r.owp)}</td>`,'hide-sm'));
+    cols.push(c('oowp','OOWP','desc',r=>r.oowp,r=>`<td class="hide-sm">${pct(r.oowp)}</td>`,'hide-sm'));
+  }
+  return cols;
+}
 function render(){
   const {cur,prev}=compute();
   const key=view==='adj'?'rank':'wlRank';
-  const top=cur.filter(r=>r[key]<=25).sort((a,b)=>a[key]-b[key]||b.score-a.score);
-  const maxS=Math.max(...cur.map(r=>r.score));
-  let h=`<thead><tr><th>Rk</th><th class="l">Δ</th><th class="l">Team</th><th>W-L</th><th>Prev</th>`;
   const wn=norm(W);
-  h+= view==='adj'?`<th>SOS rk</th><th>ATS</th>${FACTORS.map(([k,lab])=>`<th class="fx">${lab}<span>${Math.round(wn[k]*100)}%</span></th>`).join('')}<th class="tot">Score<span>of 100</span></th>`:`<th>Adj. rk</th><th>SOS rk</th><th class="hide-sm">OWP</th><th class="hide-sm">OOWP</th>`;
-  h+=`</tr></thead><tbody>`;
-  const cols=view==='adj'?16:9;
-  for(const r of top){const p=prev[r.t];const pr=p[key];
-    h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}"><td class="rk">${r[key]}</td>${mvCell(r[key],pr)}<td class="l"><span class="team">${r.name}</span><span class="chip">${r.conf}</span></td><td class="rec">${r.w}-${r.l}${r.fcsW?`<sup class="fcs" title="Includes ${r.fcsW} win over FCS">*</sup>`:''}</td><td class="${pr>25?'nr':''}">${pr}</td>`;
-    const a=r.atsRec, av=a.avg;
-    if(view==='adj') h+=`<td>${r.sosRank}</td><td>${a.c}-${a.x}${a.p?'-'+a.p:''}</td>${FACTORS.map(([k,,v])=>`<td class="fx">${(wn[k]*r[v]*100).toFixed(1)}</td>`).join('')}<td class="score tot">${(r.score*100).toFixed(1)}</td>`;
-    else h+=`<td>${r.rank}</td><td>${r.sosRank}</td><td class="hide-sm">${pct(r.owp)}</td><td class="hide-sm">${pct(r.oowp)}</td>`;
-    h+=`</tr>`;
-    if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} (#${r.atsRank}) · Yds/play ${r.yOff.toFixed(2)} off, ${r.yDef.toFixed(2)} allowed · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+  const cols=columns(key,wn,prev);
+  if(!cols.some(c=>c.id===sortCol)){sortCol='rk';sortDir=1;}
+  const sc=cols.find(c=>c.id===sortCol);
+  const sign=(sc.dir==='asc'?1:-1)*sortDir;
+  const top=cur.filter(r=>r[key]<=25).sort((a,b)=>a[key]-b[key]||b.score-a.score);
+  top.sort((a,b)=>{const x=sc.val(a),y=sc.val(b);const d=typeof x==='string'?x.localeCompare(y):x-y;return d*sign||a[key]-b[key];});
+  let h='<thead><tr>'+cols.map(c=>{const on=c.id===sortCol;const asc=on&&sign>0;
+    return `<th class="${c.cls} sortable${on?' sorted':''}" data-col="${c.id}" aria-sort="${on?(asc?'ascending':'descending'):'none'}"><button type="button" title="Sort by this column">${c.head.replace(/<span>/,`<i class="arr">${on?(asc?'▲':'▼'):''}</i><span>`)}${c.head.includes('<span>')?'':`<i class="arr">${on?(asc?'▲':'▼'):''}</i>`}</button></th>`;}).join('')+'</tr></thead><tbody>';
+  for(const r of top){
+    h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}">`+cols.map(c=>c.cell(r)).join('')+'</tr>';
+    if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} (#${r.atsRank}) · Yds/play ${r.yOff.toFixed(2)} off, ${r.yDef.toFixed(2)} allowed · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
   }
   document.getElementById('tbl').innerHTML=h+'</tbody>';
   document.getElementById('tblTitle').textContent=view==='adj'?'Top 25':'Top 25 · record only';
@@ -221,9 +248,9 @@ function renderWeights(){
   document.getElementById('w_fcs').addEventListener('input',e=>{FCSW=+e.target.value/100;document.getElementById('o_fcs').textContent=e.target.value+'%';render();});
   for(const k in DEFAULT_W) document.getElementById('w_'+k).addEventListener('input',e=>{W[k]=+e.target.value/100;const n2=norm(W);for(const j in W)document.getElementById('o_'+j).textContent=Math.round(n2[j]*100)+'%';render();});
 }
-document.getElementById('tbl').addEventListener('click',e=>{const tr=e.target.closest('tr.trow');if(!tr)return;const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();});
+document.getElementById('tbl').addEventListener('click',e=>{const th=e.target.closest('th[data-col]');if(th){const id=th.dataset.col;if(id===sortCol)sortDir=-sortDir;else{sortCol=id;sortDir=1;}render();const b=document.querySelector(`th[data-col="${id}"] button`);b&&b.focus();return;}const tr=e.target.closest('tr.trow');if(!tr)return;const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();});
 document.getElementById('tbl').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tr=e.target.closest('tr.trow');if(!tr)return;e.preventDefault();const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();const again=document.querySelector(`tr.trow[data-t="${t}"]`);again&&again.focus();});
-for(const [id,v] of [['vAdj','adj'],['vWL','wl']]) document.getElementById(id).addEventListener('click',()=>{view=v;document.getElementById('vAdj').setAttribute('aria-pressed',v==='adj');document.getElementById('vWL').setAttribute('aria-pressed',v==='wl');render();});
+for(const [id,v] of [['vAdj','adj'],['vWL','wl']]) document.getElementById(id).addEventListener('click',()=>{view=v;sortCol='rk';sortDir=1;document.getElementById('vAdj').setAttribute('aria-pressed',v==='adj');document.getElementById('vWL').setAttribute('aria-pressed',v==='wl');render();});
 document.getElementById('reset').addEventListener('click',()=>{W={...DEFAULT_W};FCSW=DEFAULT_FCS_WIN;renderWeights();render();});
 renderWeights();renderConf();render();
 </script>

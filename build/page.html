@@ -1,0 +1,228 @@
+<title>Gridiron Index</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: press-box stat sheet — one ruled column, poll table as the centerpiece, method + tuning below. */
+:root{
+  --paper:#eef1ee; --sheet:#ffffff; --ink:#14231c; --muted:#5d6b63; --rule:#d3dad5; --rule-strong:#14231c;
+  --turf:#1d5a3a; --turf-soft:#e3eee7; --pylon:#e5591c; --up:#1d7a45; --down:#c0392b; --chip:#e8ece9;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0f1613; --sheet:#151e1a; --ink:#e4ebe6; --muted:#93a39a; --rule:#2a3630; --rule-strong:#c8d3cc;
+  --turf:#5fbf8a; --turf-soft:#1b2a22; --pylon:#ff7a3d; --up:#5fcf8c; --down:#ff7b6b; --chip:#212c27; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0f1613; --sheet:#151e1a; --ink:#e4ebe6; --muted:#93a39a; --rule:#2a3630; --rule-strong:#c8d3cc;
+  --turf:#5fbf8a; --turf-soft:#1b2a22; --pylon:#ff7a3d; --up:#5fcf8c; --down:#ff7b6b; --chip:#212c27; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1040px;margin:0 auto;display:grid;gap:28px}
+header{display:grid;gap:10px;border-bottom:3px solid var(--rule-strong);padding-bottom:16px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,8vw,76px);line-height:.9;margin:0;letter-spacing:.01em;text-transform:uppercase}
+h1 span{color:var(--pylon)}
+.sub{color:var(--muted);max-width:68ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:12.5px}
+.meta b{font-weight:600}
+h2{font-family:var(--display);font-weight:800;font-size:28px;text-transform:uppercase;letter-spacing:.02em;margin:0;line-height:1}
+.bar{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px}
+.seg{display:inline-flex;border:1.5px solid var(--rule-strong);border-radius:4px;overflow:hidden}
+.seg button{font:600 13px var(--body);padding:7px 12px;background:transparent;color:var(--ink);border:0;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--sheet)}
+.seg button:focus-visible,.trow:focus-visible,summary:focus-visible,input:focus-visible,.reset:focus-visible{outline:2px solid var(--pylon);outline-offset:2px}
+.tablebox{overflow-x:auto;background:var(--sheet);border:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;min-width:980px;font-variant-numeric:tabular-nums}
+th{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:10px 8px;border-bottom:1.5px solid var(--rule-strong);white-space:nowrap}
+th.l,td.l{text-align:left}
+td{padding:9px 8px;border-bottom:1px solid var(--rule);text-align:right;font-family:var(--mono);font-size:13.5px;white-space:nowrap}
+tr.trow{cursor:pointer}
+tr.trow:hover td{background:var(--turf-soft)}
+.rk{font-family:var(--display);font-weight:900;font-size:26px;line-height:1;width:44px;text-align:center;color:var(--ink)}
+tr.top4 .rk{color:var(--pylon)}
+.team{font-family:var(--body);font-size:15.5px;font-weight:700}
+.chip{display:inline-block;font:500 10.5px var(--mono);letter-spacing:.04em;background:var(--chip);color:var(--muted);padding:2px 6px;border-radius:3px;margin-left:8px;vertical-align:2px}
+.rec{font-weight:600}
+.mv{font-weight:600;font-size:12.5px;width:46px}
+.mv.up{color:var(--up)} .mv.dn{color:var(--down)} .mv.eq{color:var(--muted)} .mv.new{color:var(--pylon)}
+.nr{color:var(--muted)}
+.score{font-weight:600}
+.meter{display:inline-block;width:56px;height:6px;background:var(--rule);vertical-align:middle;margin-left:8px;position:relative}
+.meter i{position:absolute;inset:0 auto 0 0;background:var(--turf)}
+tr.detail td{background:var(--turf-soft);white-space:normal;text-align:left;padding:12px 14px 14px 60px}
+.log{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:4px 22px;font-size:12.5px}
+.log div{display:flex;gap:8px;justify-content:space-between;border-bottom:1px dotted var(--rule);padding:3px 0}
+.log .w{color:var(--up);font-weight:600} .log .L{color:var(--down);font-weight:600}
+.log .o{flex:1;font-family:var(--body);font-size:13.5px;overflow:hidden;text-overflow:ellipsis}
+.log .orank{color:var(--muted)}
+.log .ln{color:var(--muted);min-width:42px;text-align:right}
+td.pos{color:var(--up)} td.neg{color:var(--down)}
+th.fx span,th.tot span{display:block;font-size:10.5px;color:var(--pylon);margin-top:2px;letter-spacing:.02em}
+td.fx{color:var(--muted)}
+th.fx:first-of-type,td.fx{border-left:0}
+th.tot,td.tot{border-left:1.5px solid var(--rule-strong);padding-left:10px}
+td.tot{font-size:14.5px}
+sup.fcs{color:var(--pylon);font-size:11px;margin-left:1px}
+.fcsrow{border-top:1px solid var(--rule);padding-top:10px}
+.compline{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:8px}
+.below{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+@media (max-width:760px){.below{grid-template-columns:1fr}}
+.panel{display:grid;gap:12px;align-content:start;min-width:0}
+.panel p{margin:0;color:var(--muted);max-width:65ch}
+.chips{font-size:14px}
+.outs{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}
+.outs span b{font-family:var(--mono);font-weight:600;color:var(--muted);margin-right:4px}
+.conf{display:grid;gap:7px}
+.crow{display:grid;grid-template-columns:52px 1fr 70px;gap:10px;align-items:center;font-family:var(--mono);font-size:12.5px}
+.ctrack{height:12px;background:var(--rule);position:relative}
+.ctrack i{position:absolute;inset:0 auto 0 0;background:var(--turf)}
+.ctrack::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:1.5px dashed var(--muted)}
+.weights{display:grid;gap:10px}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) 120px 44px;gap:10px;align-items:center;font-size:14px}
+.wrow small{display:block;color:var(--muted);font-size:12.5px;line-height:1.3}
+.wrow output{font-family:var(--mono);font-size:13px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--pylon)}
+.reset{font:600 13px var(--body);background:transparent;color:var(--ink);border:1.5px solid var(--rule-strong);border-radius:4px;padding:6px 12px;cursor:pointer;justify-self:start}
+.strip{display:flex;flex-wrap:wrap;gap:10px 28px;align-items:baseline;border-top:1.5px solid var(--rule-strong);border-bottom:1px solid var(--rule);padding-block:12px;margin-top:-12px}
+.stripgrp{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;min-width:0}
+.striplab{font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:.02em}
+.strip .outs{font-size:13.5px;gap:4px 12px}
+.tune .weights{grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));column-gap:36px}
+.tune .wrow.fcsrow{border-top:0;padding-top:0}
+.fyi h3{font-family:var(--display);font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.02em;margin:0;line-height:1;color:var(--muted)}
+.fyi p,.fyi li{font-size:13px;line-height:1.4}
+.fyi .method ol{gap:5px}
+.fyi .crow{font-size:11.5px;grid-template-columns:44px 1fr 66px}
+.fyi .ctrack{height:8px}
+.fyi{border-top:1px solid var(--rule);padding-top:20px}
+.method ol{margin:0;padding-left:20px;display:grid;gap:8px;max-width:70ch}
+.method li b{font-weight:700}
+.foot{font-family:var(--mono);font-size:11.5px;color:var(--muted);border-top:1px solid var(--rule);padding-top:12px}
+@media (max-width:520px){.hide-sm{display:none}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">NCAA FBS · __NTEAMS__ teams · __SEASON__ season</div>
+  <h1>Gridiron <span>Index</span></h1>
+  <p class="sub">A computer poll that starts from won-lost record, then adjusts for how good the opponents were, how good their opponents were, conference strength, who you actually beat, how well you played snap by snap, and how you played against the point spread.</p>
+  <div class="meta"><span>Results through <b>__ASOF__</b></span><span>Prev = through <b>__PREVTHRU__</b></span><span>Updated __UPDATED__</span></div>
+</header>
+
+<section style="display:grid;gap:12px">
+  <div class="bar">
+    <h2 id="tblTitle">Top 25</h2>
+    <div class="seg" role="group" aria-label="Ranking view">
+      <button id="vAdj" aria-pressed="true">Strength-adjusted</button>
+      <button id="vWL" aria-pressed="false">Record only</button>
+    </div>
+  </div>
+  <div class="tablebox"><table id="tbl"></table></div>
+  <div class="eyebrow" id="hint">Factor columns show points earned toward the score (weight × factor value). They add up to the score (within ±0.2 from rounding). Tap a team for its game log.</div>
+</section>
+
+<section class="strip" aria-label="Bubble and drop-outs">
+  <div class="stripgrp"><span class="striplab">On the bubble</span><div class="outs" id="next"></div></div>
+  <div class="stripgrp"><span class="striplab">Dropped out</span><div class="outs" id="dropped"></div></div>
+</section>
+
+<section class="panel tune">
+  <div class="bar"><h2>Tune the weights</h2><button class="reset" id="reset">Reset to defaults</button></div>
+  <p>Drag to change how much each factor counts. Rankings, movement, the factor columns and the bubble update instantly. Weights are rescaled to total 100%.</p>
+  <div class="weights" id="weights"></div>
+</section>
+
+<div class="below fyi">
+  <section class="panel">
+    <h3>Conference strength</h3>
+    <p>Non-conference record against FBS opponents. The dashed line is .500.</p>
+    <div class="conf" id="conf"></div>
+  </section>
+  <section class="panel method">
+    <h3>How it's built</h3>
+    <ol>
+      <li><b>Win %.</b> A win over an FCS team counts as 0.4 of a win here. A loss to an FCS team counts in full. The W-L column shows the real record; * marks teams with an FCS win.</li>
+      <li><b>Opponents' win % (OWP).</b> Each opponent's record, with its game against you removed so your result doesn't inflate or deflate it.</li>
+      <li><b>Opponents' opponents' win % (OOWP).</b> The average OWP of everyone you played. This catches a 6-1 opponent whose wins came against nobody.</li>
+      <li><b>Opponent conference strength.</b> Each conference is rated by its non-conference record vs FBS teams (shrunk toward .500 early). You get the average rating of your opponents' conferences.</li>
+      <li><b>Yards per play (opponent-adjusted).</b> For each game vs an FBS team: how many more yards per play you gained than that opponent usually allows, plus how many fewer you allowed than that opponent usually gains. This rewards teams that consistently outplay opponents snap by snap, which predicts future results better than the scoreboard alone. FCS games are left out.</li>
+      <li><b>Against the spread.</b> For each game: actual margin plus the team's ESPN line (DraftKings). Beating a 7-point spread by 10 is +3. Capped at ±21 per game so one fluke doesn't dominate.</li>
+      <li><b>Margin.</b> Point differential per game, capped at 24 so running up the score earns nothing extra. FCS games are discounted here and in the spread factor.</li>
+      <li><b>Quality results.</b> Bonus for wins over teams rated top 10, 11–25 and 26–50; penalty for losses to teams rated 51+ and to FCS teams.</li>
+    </ol>
+    <p>Default weights: win % 27, opponents' win % 19, yards per play 23, opponents' opponents' win % 8, conference strength 8, against the spread 8, margin 4, quality results 3. Tested on the 2024 and 2025 seasons: this mix picked 67.6% of later games correctly vs 64.1% for record alone, and beat the AP poll on games involving ranked teams (75.1% vs 73.2%). FCS opponents are treated as a .300 team in a weak conference. SOS rank combines OWP and OOWP at 2:1.</p>
+  </section>
+</div>
+<div class="foot">Data: final scores, box-score yards and plays, and ESPN pregame spreads for all __NGAMES__ completed games involving FBS teams. Records are checked against official standings for all __NTEAMS__ teams on every update.</div>
+</div>
+
+<script>
+const D=__DATA__;
+__MODEL__
+const LABELS={wp:['Win %','Won-lost record, FCS wins discounted'],ypp:['Yards per play','Per-play edge vs what each opponent usually allows and gains'],ats:['Against the spread','Beat or missed the ESPN line, capped at 21'],owp:["Opponents' win %",'How good your opponents were'],oowp:["Opp. opponents' win %",'How good their schedules were'],conf:['Opp. conference strength','Non-conference record of opponents’ leagues'],mov:['Margin (capped)','Point differential, capped at 24'],qual:['Quality results','Top-25 wins, bad losses']};
+const PREV_WEEK=__PREVWEEK__, CUR_WEEK=99;
+const FACTORS=[['wp','Win %','wp'],['owp','Opp W%','owp'],['oowp','Opp-opp W%','oowp'],['conf','Opp conf','oconf'],['ypp','Yds/play','ypp'],['ats','vs Spread','ats'],['mov','Margin','mov'],['qual','Quality','qual']];
+let W={...DEFAULT_W}, FCSW=DEFAULT_FCS_WIN, view='adj', open=new Set();
+const pct=x=>x.toFixed(3).replace(/^0/,'');
+function norm(w){const s=Object.values(w).reduce((a,b)=>a+b,0)||1;const o={};for(const k in w)o[k]=w[k]/s;return o;}
+function compute(){const w=norm(W);return {cur:rankModel(D,CUR_WEEK,w,FCSW),prev:rankModel(D,PREV_WEEK,w,FCSW)};}
+function mvCell(now,before){
+  if(before>25&&now<=25) return `<td class="mv new">NEW</td>`;
+  const d=before-now; if(d>0) return `<td class="mv up">▲${d}</td>`; if(d<0) return `<td class="mv dn">▼${-d}</td>`; return `<td class="mv eq">–</td>`;
+}
+function gameLog(t,cur){
+  const rows=[];for(const [w,h,hs,a,as,line,neu] of D.games){if(w>CUR_WEEK)continue;
+    let opp,pf,pa,home,ln; if(h===t){opp=a;pf=hs;pa=as;home=true;ln=line}else if(a===t){opp=h;pf=as;pa=hs;home=false;ln=-line}else continue;
+    rows.push({w,opp,pf,pa,home,neu,ln});}
+  rows.sort((x,y)=>x.w-y.w);
+  const key=view==='adj'?'rank':'wlRank';
+  return rows.map(r=>{const win=r.pf>r.pa;const on=r.opp===null?'FCS opponent':D.names[r.opp];const or=r.opp===null?'':`#${cur[r.opp][key]}`;
+    const m=r.pf-r.pa+r.ln, lt=r.ln===0?'PK':(r.ln>0?'+':'')+r.ln;
+    return `<div><span class="${win?'w':'L'}">${win?'W':'L'}</span><span class="o">${r.neu?'vs ':r.home?'':'@ '}${on} <span class="orank">${or}</span></span><span>${r.pf}-${r.pa}</span><span class="ln">${lt}</span><span class="${m>0?'w':m<0?'L':'orank'}">${m>0?'+':''}${m}</span></div>`}).join('');
+}
+function render(){
+  const {cur,prev}=compute();
+  const key=view==='adj'?'rank':'wlRank';
+  const top=cur.filter(r=>r[key]<=25).sort((a,b)=>a[key]-b[key]||b.score-a.score);
+  const maxS=Math.max(...cur.map(r=>r.score));
+  let h=`<thead><tr><th>Rk</th><th class="l">Δ</th><th class="l">Team</th><th>W-L</th><th>Prev</th>`;
+  const wn=norm(W);
+  h+= view==='adj'?`<th>SOS rk</th><th>ATS</th>${FACTORS.map(([k,lab])=>`<th class="fx">${lab}<span>${Math.round(wn[k]*100)}%</span></th>`).join('')}<th class="tot">Score<span>of 100</span></th>`:`<th>Adj. rk</th><th>SOS rk</th><th class="hide-sm">OWP</th><th class="hide-sm">OOWP</th>`;
+  h+=`</tr></thead><tbody>`;
+  const cols=view==='adj'?16:9;
+  for(const r of top){const p=prev[r.t];const pr=p[key];
+    h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}"><td class="rk">${r[key]}</td>${mvCell(r[key],pr)}<td class="l"><span class="team">${r.name}</span><span class="chip">${r.conf}</span></td><td class="rec">${r.w}-${r.l}${r.fcsW?`<sup class="fcs" title="Includes ${r.fcsW} win over FCS">*</sup>`:''}</td><td class="${pr>25?'nr':''}">${pr}</td>`;
+    const a=r.atsRec, av=a.avg;
+    if(view==='adj') h+=`<td>${r.sosRank}</td><td>${a.c}-${a.x}${a.p?'-'+a.p:''}</td>${FACTORS.map(([k,,v])=>`<td class="fx">${(wn[k]*r[v]*100).toFixed(1)}</td>`).join('')}<td class="score tot">${(r.score*100).toFixed(1)}</td>`;
+    else h+=`<td>${r.rank}</td><td>${r.sosRank}</td><td class="hide-sm">${pct(r.owp)}</td><td class="hide-sm">${pct(r.oowp)}</td>`;
+    h+=`</tr>`;
+    if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} (#${r.atsRank}) · Yds/play ${r.yOff.toFixed(2)} off, ${r.yDef.toFixed(2)} allowed · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+  }
+  document.getElementById('tbl').innerHTML=h+'</tbody>';
+  document.getElementById('tblTitle').textContent=view==='adj'?'Top 25':'Top 25 · record only';
+  const bub=cur.filter(r=>r[key]>25&&r[key]<=32).sort((a,b)=>a[key]-b[key]);
+  document.getElementById('next').innerHTML=bub.map(r=>`<span><b>${r[key]}</b>${r.name} ${r.w}-${r.l}</span>`).join('');
+  const drop=prev.filter(p=>p[key]<=25&&cur[p.t][key]>25).sort((a,b)=>a[key]-b[key]);
+  document.getElementById('dropped').innerHTML=drop.length?drop.map(p=>`<span><b>${p[key]}→${cur[p.t][key]}</b>${p.name}</span>`).join(''):'<span>None</span>';
+}
+function renderConf(){
+  const rec=confStrength(D,CUR_WEEK);
+  const rows=Object.entries(rec).filter(([c])=>c!=='IND').map(([c,[w,l]])=>({c,w,l,p:w/(w+l)})).sort((a,b)=>b.p-a.p);
+  document.getElementById('conf').innerHTML=rows.map(r=>`<div class="crow"><span>${r.c}</span><span class="ctrack"><i style="width:${r.p*100}%"></i></span><span>${r.w}-${r.l} ${pct(r.p)}</span></div>`).join('');
+}
+function renderWeights(){
+  const n=norm(W);
+  document.getElementById('weights').innerHTML=Object.keys(DEFAULT_W).map(k=>`<div class="wrow"><label for="w_${k}">${LABELS[k][0]}<small>${LABELS[k][1]}</small></label><input id="w_${k}" type="range" min="0" max="60" step="1" value="${Math.round(W[k]*100)}"><output id="o_${k}">${Math.round(n[k]*100)}%</output></div>`).join('');
+  document.getElementById('weights').insertAdjacentHTML('beforeend',`<div class="wrow fcsrow"><label for="w_fcs">FCS win credit<small>Share of a full win an FCS win is worth</small></label><input id="w_fcs" type="range" min="0" max="100" step="5" value="${Math.round(FCSW*100)}"><output id="o_fcs">${Math.round(FCSW*100)}%</output></div>`);
+  document.getElementById('w_fcs').addEventListener('input',e=>{FCSW=+e.target.value/100;document.getElementById('o_fcs').textContent=e.target.value+'%';render();});
+  for(const k in DEFAULT_W) document.getElementById('w_'+k).addEventListener('input',e=>{W[k]=+e.target.value/100;const n2=norm(W);for(const j in W)document.getElementById('o_'+j).textContent=Math.round(n2[j]*100)+'%';render();});
+}
+document.getElementById('tbl').addEventListener('click',e=>{const tr=e.target.closest('tr.trow');if(!tr)return;const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();});
+document.getElementById('tbl').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tr=e.target.closest('tr.trow');if(!tr)return;e.preventDefault();const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();const again=document.querySelector(`tr.trow[data-t="${t}"]`);again&&again.focus();});
+for(const [id,v] of [['vAdj','adj'],['vWL','wl']]) document.getElementById(id).addEventListener('click',()=>{view=v;document.getElementById('vAdj').setAttribute('aria-pressed',v==='adj');document.getElementById('vWL').setAttribute('aria-pressed',v==='wl');render();});
+document.getElementById('reset').addEventListener('click',()=>{W={...DEFAULT_W};FCSW=DEFAULT_FCS_WIN;renderWeights();render();});
+renderWeights();renderConf();render();
+</script>

@@ -126,6 +126,7 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
     <div class="seg" role="group" aria-label="Ranking view">
       <button id="vAdj" aria-pressed="true">Strength-adjusted</button>
       <button id="vWL" aria-pressed="false">Record only</button>
+      <button id="vProj" aria-pressed="false" hidden>Projected finish</button>
     </div>
   </div>
   <div class="tablebox"><table id="tbl"></table></div>
@@ -134,7 +135,7 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
 
 <section class="strip" aria-label="Bubble and drop-outs">
   <div class="stripgrp"><span class="striplab">On the bubble</span><div class="outs" id="next"></div></div>
-  <div class="stripgrp"><span class="striplab">Dropped out</span><div class="outs" id="dropped"></div></div>
+  <div class="stripgrp"><span class="striplab" id="dropLab">Dropped out</span><div class="outs" id="dropped"></div></div>
   <div id="pollouts" style="display:contents"></div>
 </section>
 
@@ -163,6 +164,13 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
       <li><b>Quality results.</b> Bonus for wins over teams rated top 10, 11–25 and 26–50; penalty for losses to teams rated 51+ and to FCS teams.</li>
     </ol>
     <p>Default weights: win % 27, opponents' win % 19, yards per play 23, opponents' opponents' win % 8, conference strength 8, against the spread 8, margin 4, quality results 3. Tested on the 2024 and 2025 seasons: this mix picked 67.6% of later games correctly vs 64.1% for record alone, and beat the AP poll on games involving ranked teams (75.1% vs 73.2%). FCS opponents are treated as a .300 team in a weak conference. SOS rank combines OWP and OOWP at 2:1.</p>
+    <h3 style="margin-top:8px">How the projection works</h3>
+    <ol>
+      <li><b>Team ratings in points.</b> Half comes from performance: opponent-adjusted scoring margin (capped at 28 a game) and opponent-adjusted yards per play, converted to points, weighted 1:3 because yards per play predicted better. The other half comes from the betting market: the team strengths that best explain the ESPN point spreads of games already played. Home field is worth about 3 points.</li>
+      <li><b>Win chance for each remaining game.</b> From the rating gap, assuming real margins land within about 15 points of the prediction two times in three. When ESPN has posted a line for the game, the line is used instead.</li>
+      <li><b>Simulate the rest of the season.</b> Every remaining regular-season game is played out thousands of times, with each team's rating also allowed to be a bit off in each run. Each finished season is ranked by this poll at its default weights, and teams are ordered by their average final rank.</li>
+    </ol>
+    <p>Tested on 2026 games, fitting only on earlier weeks (weeks 4–9, 308 games): the ratings picked 66% of winners, and the ESPN line picked 72%. That gap narrowed from early October onward as the ratings got more games, which is why posted lines are used for next week's games.</p>
   </section>
 </div>
 <div class="foot">Data: final scores, box-score yards and plays, and ESPN pregame spreads for all __NGAMES__ completed games involving FBS teams. Records are checked against official standings for all __NTEAMS__ teams on every update.</div>
@@ -174,11 +182,23 @@ __MODEL__
 const LABELS={wp:['Win %','Won-lost record, FCS wins discounted'],ypp:['Yards per play','Per-play edge vs what each opponent usually allows and gains'],ats:['Against the spread','Beat or missed the ESPN line, capped at 21'],owp:["Opponents' win %",'How good your opponents were'],oowp:["Opp. opponents' win %",'How good their schedules were'],conf:['Opp. conference strength','Non-conference record of opponents’ leagues'],mov:['Margin (capped)','Point differential, capped at 24'],qual:['Quality results','Top-25 wins, bad losses']};
 const PREV_WEEK=__PREVWEEK__, CUR_WEEK=99;
 const POLLS=D.polls||[];
+const HINT=document.getElementById('hint').innerHTML;
 const FACTORS=[['wp','Win %','wp'],['owp','Opp W%','owp'],['oowp','Opp-opp W%','oowp'],['conf','Opp conf','oconf'],['ypp','Yds/play','ypp'],['ats','vs Spread','ats'],['mov','Margin','mov'],['qual','Quality','qual']];
 let W={...DEFAULT_W}, FCSW=DEFAULT_FCS_WIN, view='adj', open=new Set();
 const pct=x=>x.toFixed(3).replace(/^0/,'');
 function norm(w){const s=Object.values(w).reduce((a,b)=>a+b,0)||1;const o={};for(const k in w)o[k]=w[k]/s;return o;}
-function compute(){const w=norm(W);return {cur:rankModel(D,CUR_WEEK,w,FCSW),prev:rankModel(D,PREV_WEEK,w,FCSW)};}
+const PROJ=D.proj||null, FUT=D.future||[];
+function compute(){const w=norm(W);const cur=rankModel(D,CUR_WEEK,w,FCSW);
+  if(PROJ)for(const r of cur){const x=PROJ.teams[r.t];Object.assign(r,x,{w:r.w,l:r.l,pw:x.w,pl:x.l,nowRank:r.rank});}
+  return {cur,prev:rankModel(D,PREV_WEEK,w,FCSW)};}
+const keyOf=()=>view==='adj'?'rank':view==='wl'?'wlRank':'projRank';
+const pctTxt=x=>x>=0.995?'>99%':x>0&&x<0.005?'<1%':Math.round(x*100)+'%';
+function remaining(t,cur){
+  return FUT.map((g,i)=>[g,i]).filter(([g])=>g[1]===t||g[2]===t).map(([[w,h,a,neu,line],i])=>{
+    const home=h===t, opp=home?a:h, p=home?PROJ.future[i]:1-PROJ.future[i];
+    const on=opp===null?'FCS opponent':D.names[opp], or=opp===null?'':`#${cur[opp].projRank}`;
+    return `<div><span class="${p>=0.5?'w':'L'}">${pctTxt(p)}</span><span class="o">${neu?'vs ':home?'':'@ '}${on} <span class="orank">${or}</span></span><span class="ln">${line!=null?'line '+((home?line:-line)>0?'+':'')+(home?line:-line):''}</span></div>`;}).join('')||'<div>No regular-season games left</div>';
+}
 function mvCell(now,before){
   if(before>25&&now<=25) return `<td class="mv new">NEW</td>`;
   const d=before-now; if(d>0) return `<td class="mv up">▲${d}</td>`; if(d<0) return `<td class="mv dn">▼${-d}</td>`; return `<td class="mv eq">–</td>`;
@@ -188,25 +208,36 @@ function gameLog(t,cur){
     let opp,pf,pa,home,ln; if(h===t){opp=a;pf=hs;pa=as;home=true;ln=line}else if(a===t){opp=h;pf=as;pa=hs;home=false;ln=-line}else continue;
     rows.push({w,opp,pf,pa,home,neu,ln});}
   rows.sort((x,y)=>x.w-y.w);
-  const key=view==='adj'?'rank':'wlRank';
+  const key=keyOf();
   return rows.map(r=>{const win=r.pf>r.pa;const on=r.opp===null?'FCS opponent':D.names[r.opp];const or=r.opp===null?'':`#${cur[r.opp][key]}`;
     const m=r.pf-r.pa+r.ln, lt=r.ln===0?'PK':(r.ln>0?'+':'')+r.ln;
     return `<div><span class="${win?'w':'L'}">${win?'W':'L'}</span><span class="o">${r.neu?'vs ':r.home?'':'@ '}${on} <span class="orank">${or}</span></span><span>${r.pf}-${r.pa}</span><span class="ln">${lt}</span><span class="${m>0?'w':m<0?'L':'orank'}">${m>0?'+':''}${m}</span></div>`}).join('');
 }
 let sortCol='rk', sortDir=1; // 1 = the column's natural order, -1 = reversed
 function columns(key,wn,prev){
-  const pr=r=>prev[r.t][key];
+  const pr=r=>view==='proj'?r.nowRank:prev[r.t][key];
   const c=(id,head,dir,val,cell,cls='')=>({id,head,dir,val,cell,cls});
   const cols=[
     c('rk','Rk','asc',r=>r[key],r=>`<td class="rk">${r[key]}</td>`),
     c('mv','Δ','desc',r=>pr(r)-r[key],r=>mvCell(r[key],pr(r)),'l'),
     c('team','Team','asc',r=>r.name,r=>`<td class="l"><span class="team">${r.name}</span><span class="chip">${r.conf}</span></td>`,'l'),
     c('wl','W-L','desc',r=>r.rawWP*100+r.w,r=>`<td class="rec">${r.w}-${r.l}${r.fcsW?`<sup class="fcs" title="Includes ${r.fcsW} win over FCS">*</sup>`:''}</td>`),
-    c('prev','Prev','asc',r=>pr(r),r=>`<td class="${pr(r)>25?'nr':''}">${pr(r)}</td>`),
+    c('prev',view==='proj'?'Now':'Prev','asc',r=>pr(r),r=>`<td class="${pr(r)>25?'nr':''}">${pr(r)}</td>`),
   ];
+  if(view==='proj'){
+    cols.splice(4,0,c('pwl','Proj W-L','desc',r=>r.pw-r.pl,r=>`<td class="rec">${r.pw.toFixed(1)}-${r.pl.toFixed(1)}</td>`));
+  }
   // Outside polls (AP, CFP committee): rank, or a dash when unranked. Unranked sorts last.
   for(const p of POLLS) cols.push(c(p.key,p.label,'asc',r=>p.ranks[r.t]||99,r=>p.ranks[r.t]?`<td class="poll">${p.ranks[r.t]}</td>`:`<td class="poll nr">–</td>`,'poll'));
-  if(view==='adj'){
+  if(view==='proj'){
+    cols.push(c('range','Likely rk<span>80% range</span>','asc',r=>r.lo+r.hi/1000,r=>`<td>${r.lo}–${r.hi}</td>`));
+    cols.push(c('top25','Top 25<span>odds</span>','desc',r=>r.top25,r=>`<td>${pctTxt(r.top25)}</td>`));
+    cols.push(c('unb','Unbeaten<span>odds</span>','desc',r=>r.unbeaten,r=>r.l===0||r.unbeaten>0?`<td>${pctTxt(r.unbeaten)}</td>`:`<td class="nr">–</td>`));
+    cols.push(c('rating','Rating<span>pts vs avg</span>','desc',r=>r.rating,r=>`<td class="score">${r.rating>0?'+':''}${r.rating.toFixed(1)}</td>`));
+    cols.push(c('ratingRk','Rating rk','asc',r=>r.ratingRank,r=>`<td>${r.ratingRank}</td>`));
+    cols.push(c('left','Games left','desc',r=>r.left,r=>`<td>${r.left}</td>`));
+    cols.push(c('remsos','Rem. SOS rk','asc',r=>r.remSos||999,r=>`<td class="${r.remSos?'':'nr'}">${r.remSos||'–'}</td>`));
+  } else if(view==='adj'){
     cols.push(c('sos','SOS rk','asc',r=>r.sosRank,r=>`<td>${r.sosRank}</td>`));
     cols.push(c('ats','ATS','desc',r=>{const a=r.atsRec;return (a.c+a.p/2)/Math.max(1,a.c+a.x+a.p)*100+a.avg/100;},r=>{const a=r.atsRec;return `<td>${a.c}-${a.x}${a.p?'-'+a.p:''}</td>`;}));
     for(const [k,lab,v] of FACTORS) cols.push(c(k,`${lab}<span>${Math.round(wn[k]*100)}%</span>`,'desc',r=>wn[k]*r[v],r=>`<td class="fx">${(wn[k]*r[v]*100).toFixed(1)}</td>`,'fx'));
@@ -221,7 +252,8 @@ function columns(key,wn,prev){
 }
 function render(){
   const {cur,prev}=compute();
-  const key=view==='adj'?'rank':'wlRank';
+  const key=keyOf();
+  const before=t=>view==='proj'?cur[t].nowRank:prev[t][key];
   const wn=norm(W);
   const cols=columns(key,wn,prev);
   if(!cols.some(c=>c.id===sortCol)){sortCol='rk';sortDir=1;}
@@ -233,14 +265,19 @@ function render(){
     return `<th class="${c.cls} sortable${on?' sorted':''}" data-col="${c.id}" aria-sort="${on?(asc?'ascending':'descending'):'none'}"><button type="button" title="Sort by this column">${c.head.replace(/<span>/,`<i class="arr">${on?(asc?'▲':'▼'):''}</i><span>`)}${c.head.includes('<span>')?'':`<i class="arr">${on?(asc?'▲':'▼'):''}</i>`}</button></th>`;}).join('')+'</tr></thead><tbody>';
   for(const r of top){
     h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}">`+cols.map(c=>c.cell(r)).join('')+'</tr>';
-    if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} (#${r.atsRank}) · Yds/play ${r.yOff.toFixed(2)} off, ${r.yDef.toFixed(2)} allowed · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+    if(open.has(r.t)&&view==='proj') h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Rating ${r.rating>0?'+':''}${r.rating.toFixed(1)} pts vs an average FBS team (#${r.ratingRank}) · Projected ${r.pw.toFixed(1)}-${r.pl.toFixed(1)} · Average finish #${r.avgRank} · 80% range #${r.lo}–#${r.hi} · Top-25 odds ${pctTxt(r.top25)}${r.l===0||r.unbeaten>0?' · Unbeaten odds '+pctTxt(r.unbeaten):''}</div><div class="compline">Remaining games: win chance, opponent (projected rank), posted ESPN line</div><div class="log">${remaining(r.t,cur)}</div><div class="compline" style="margin-top:10px">Played</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+    else if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} (#${r.atsRank}) · Yds/play ${r.yOff.toFixed(2)} off, ${r.yDef.toFixed(2)} allowed · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
   }
   document.getElementById('tbl').innerHTML=h+'</tbody>';
-  document.getElementById('tblTitle').textContent=view==='adj'?'Top 25':'Top 25 · record only';
+  document.getElementById('tblTitle').textContent=view==='adj'?'Top 25':view==='wl'?'Top 25 · record only':'Projected final Top 25';
+  document.getElementById('hint').innerHTML=view==='proj'
+    ?`Projected final rank = average end-of-regular-season rank in this poll (default weights) across ${PROJ.sims.toLocaleString()} simulations of every remaining game. Now = current rank. Rating = points better than an average FBS team on a neutral field. Rem. SOS rk = toughness of games left (1 = hardest). Conference title games and bowls are not simulated. The weight sliders don't change projections. Tap a team for its remaining schedule.`
+    :HINT;
+  document.getElementById('dropLab').textContent=view==='proj'?'Projected to drop out':'Dropped out';
   const bub=cur.filter(r=>r[key]>25&&r[key]<=32).sort((a,b)=>a[key]-b[key]);
   document.getElementById('next').innerHTML=bub.map(r=>`<span><b>${r[key]}</b>${r.name} ${r.w}-${r.l}</span>`).join('');
-  const drop=prev.filter(p=>p[key]<=25&&cur[p.t][key]>25).sort((a,b)=>a[key]-b[key]);
-  document.getElementById('dropped').innerHTML=drop.length?drop.map(p=>`<span><b>${p[key]}→${cur[p.t][key]}</b>${p.name}</span>`).join(''):'<span>None</span>';
+  const drop=cur.filter(r=>before(r.t)<=25&&r[key]>25).sort((a,b)=>before(a.t)-before(b.t));
+  document.getElementById('dropped').innerHTML=drop.length?drop.map(r=>`<span><b>${before(r.t)}→${r[key]}</b>${r.name}</span>`).join(''):'<span>None</span>';
   document.getElementById('pollouts').innerHTML=POLLS.map(p=>{
     const miss=cur.filter(r=>p.ranks[r.t]&&r[key]>25).sort((a,b)=>p.ranks[a.t]-p.ranks[b.t]);
     return `<div class="stripgrp"><span class="striplab">${p.label} top 25, not ours</span><div class="outs">${miss.length?miss.map(r=>`<span><b>${p.label} ${p.ranks[r.t]}</b>${r.name} (ours ${r[key]})</span>`).join(''):'<span>None</span>'}</div></div>`;}).join('');
@@ -259,7 +296,9 @@ function renderWeights(){
 }
 document.getElementById('tbl').addEventListener('click',e=>{const th=e.target.closest('th[data-col]');if(th){const id=th.dataset.col;if(id===sortCol)sortDir=-sortDir;else{sortCol=id;sortDir=1;}render();const b=document.querySelector(`th[data-col="${id}"] button`);b&&b.focus();return;}const tr=e.target.closest('tr.trow');if(!tr)return;const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();});
 document.getElementById('tbl').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tr=e.target.closest('tr.trow');if(!tr)return;e.preventDefault();const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();const again=document.querySelector(`tr.trow[data-t="${t}"]`);again&&again.focus();});
-for(const [id,v] of [['vAdj','adj'],['vWL','wl']]) document.getElementById(id).addEventListener('click',()=>{view=v;sortCol='rk';sortDir=1;document.getElementById('vAdj').setAttribute('aria-pressed',v==='adj');document.getElementById('vWL').setAttribute('aria-pressed',v==='wl');render();});
+const VIEWS=[['vAdj','adj'],['vWL','wl'],['vProj','proj']];
+if(PROJ) document.getElementById('vProj').hidden=false;
+for(const [id,v] of VIEWS) document.getElementById(id).addEventListener('click',()=>{view=v;sortCol='rk';sortDir=1;for(const [i2,v2] of VIEWS)document.getElementById(i2).setAttribute('aria-pressed',v===v2);render();});
 document.getElementById('reset').addEventListener('click',()=>{W={...DEFAULT_W};FCSW=DEFAULT_FCS_WIN;renderWeights();render();});
 renderWeights();renderConf();render();
 </script>

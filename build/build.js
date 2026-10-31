@@ -3,6 +3,8 @@
 //        node build/build.js --data f   (render from a saved data file, no network)
 const fs = require('fs'), path = require('path');
 const { rankModel } = require('./model.js');
+const { simulate } = require('./predict.js');
+const NSIMS = 5000;
 const ROOT = path.join(__dirname, '..');
 const B = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football';
 const C = 'https://sports.core.api.espn.com/v2/sports/football/leagues/college-football';
@@ -42,7 +44,7 @@ async function fetchData() {
       if (!c.status.type.completed) {
         // Unplayed regular-season game with both teams known: kept for the season projection
         const ht = c.competitors.find(x => x.homeAway === 'home') || c.competitors[0], at = c.competitors.find(x => x !== ht);
-        if (st === 2 && c.status.type.state === 'pre' && ht?.team?.id && at?.team?.id && +ht.team.id > 0 && +at.team.id > 0)
+        if (st === 2 && ['pre', 'in'].includes(c.status.type.state) && ht?.team?.id && at?.team?.id && +ht.team.id > 0 && +at.team.id > 0)
           F[e.id] = { ev: e.id, date: e.date, h: ht.team.id, a: at.team.id, neu: c.neutralSite ? 1 : 0 };
         continue;
       }
@@ -163,6 +165,12 @@ function render(D) {
   };
   let page = fs.readFileSync(path.join(__dirname, 'page.html'), 'utf8');
   const data = { teams: D.teams, names: D.names, conf: D.conf, games: D.games, polls: (D.polls || []).map(p => ({ key: p.key, label: p.label, name: p.name, ranks: p.ranks })) };
+  if ((D.future || []).length) {
+    const t = Date.now();
+    data.future = D.future.map(g => g.slice(0, 5));
+    data.proj = simulate(D, NSIMS);
+    console.log(`Projection: ${NSIMS} simulations of ${D.future.length} remaining games in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+  }
   page = page.replace('__DATA__', () => JSON.stringify(data)).replace('__MODEL__', () => fs.readFileSync(path.join(__dirname, 'model.js'), 'utf8'));
   for (const [k, v] of Object.entries(meta)) page = page.split(k).join(v);
   if (/__[A-Z]+__/.test(page)) throw new Error('Unfilled placeholder: ' + page.match(/__[A-Z]+__/)[0]);

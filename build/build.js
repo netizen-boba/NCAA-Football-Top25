@@ -31,14 +31,21 @@ async function fetchData() {
   const t0 = seasonStart(season);
   const list = await getJSON(`${C}/seasons/${season}/types/2/groups/80/teams?limit=300`);
   const ids = list.items.map(x => x.$ref.match(/teams\/(\d+)/)[1]);
-  const T = {}, G = {};
+  const T = {}, G = {}, F = {};
   const jobs = []; ids.forEach(id => { jobs.push([id, 2]); jobs.push([id, 3]); });
   await pool(jobs, async ([id, st]) => {
     const s = await getJSON(`${B}/teams/${id}/schedule?season=${season}&seasontype=${st}`);
     if (!s) return;
     if (st === 2) { const gr = s.team?.groups || {}; T[id] = { abbr: s.team.abbreviation, short: s.team.shortDisplayName, gid: gr.id, pid: gr.parent?.id, rec: s.team.recordSummary || '' }; }
     for (const e of s.events || []) {
-      const c = e.competitions[0]; if (!c.status.type.completed) continue;
+      const c = e.competitions[0];
+      if (!c.status.type.completed) {
+        // Unplayed regular-season game with both teams known: kept for the season projection
+        const ht = c.competitors.find(x => x.homeAway === 'home') || c.competitors[0], at = c.competitors.find(x => x !== ht);
+        if (st === 2 && c.status.type.state === 'pre' && ht?.team?.id && at?.team?.id && +ht.team.id > 0 && +at.team.id > 0)
+          F[e.id] = { ev: e.id, date: e.date, h: ht.team.id, a: at.team.id, neu: c.neutralSite ? 1 : 0 };
+        continue;
+      }
       const sc = x => x.score?.value ?? +x.score;
       const h = c.competitors.find(x => x.homeAway === 'home') || c.competitors[0], a = c.competitors.find(x => x !== h);
       G[e.id] = { ev: e.id, date: e.date, h: h.team.id, hs: sc(h), a: a.team.id, as: sc(a), neu: c.neutralSite ? 1 : 0 };
@@ -78,6 +85,18 @@ async function fetchData() {
       g.hy == null ? null : +g.hy.toFixed(3), g.ay == null ? null : +g.ay.toFixed(3)]),
     lastDate: games.reduce((m, g) => (g.date > m ? g.date : m), ''),
   };
+  // Remaining schedule: [week, homeIdx|null, awayIdx|null, neutral, homeLine|null, date]; null = FCS team.
+  // Lines are only posted about a week ahead, so only games in the next 9 days are checked for one.
+  const fut = Object.values(F).filter(g => (g.h in idx || g.a in idx) && !G[g.ev]);
+  const soon = Date.now() + 9 * 864e5;
+  await pool(fut.filter(g => Date.parse(g.date) < soon), async g => {
+    const sm = await getJSON(`${B}/summary?event=${g.ev}`).catch(() => null);
+    const p = (sm?.pickcenter || []).find(x => typeof x.spread === 'number');
+    g.line = p ? p.spread : null;
+  });
+  D.future = fut.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0)).map(g => [
+    Math.floor((Date.parse(g.date) - t0) / 864e5 / 7), g.h in idx ? idx[g.h] : null, g.a in idx ? idx[g.a] : null, g.neu, g.line ?? null, g.date]);
+  console.log(`Remaining games ${D.future.length}, with posted lines ${D.future.filter(g => g[4] != null).length}`);
   D.polls = await fetchPolls(idx);
   return D;
 }

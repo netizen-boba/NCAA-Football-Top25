@@ -4,6 +4,8 @@ on:
   schedule:
     # Saturday and Sunday mornings, 11:23 UTC (7:23 AM EDT / 6:23 AM EST)
     - cron: "23 11 * * 0,6"
+    # Wednesday morning: picks up Sunday's AP poll and Tuesday night's CFP committee rankings
+    - cron: "23 11 * * 3"
   workflow_dispatch:
 
 permissions:

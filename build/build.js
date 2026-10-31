@@ -78,7 +78,32 @@ async function fetchData() {
       g.hy == null ? null : +g.hy.toFixed(3), g.ay == null ? null : +g.ay.toFixed(3)]),
     lastDate: games.reduce((m, g) => (g.date > m ? g.date : m), ''),
   };
+  D.polls = await fetchPolls(idx);
   return D;
+}
+
+// AP poll and College Football Playoff committee rankings from ESPN. Optional: a failure here never blocks the build.
+// Each poll: { key, label, name, date, ranks } where ranks[i] is team i's rank (or null if unranked).
+async function fetchPolls(idx) {
+  try {
+    const r = await getJSON(`${B}/rankings`);
+    const want = [
+      ['ap', 'AP', p => p.type === 'ap' || /^AP\b/i.test(p.name || '')],
+      ['cfp', 'CFP', p => p.type === 'cfp' || /playoff|\bCFP\b/i.test(`${p.name} ${p.shortName}`)],
+    ];
+    const out = [];
+    for (const [key, label, match] of want) {
+      const p = (r?.rankings || []).find(match);
+      if (!p || !(p.ranks || []).length) { console.log(`Poll ${label}: not available`); continue; }
+      const ranks = Object.keys(idx).map(() => null);
+      let hit = 0;
+      for (const x of p.ranks) { const i = idx[x.team?.id]; if (i != null && x.current) { ranks[i] = x.current; hit++; } }
+      console.log(`Poll ${label}: ${p.name}, ${p.date}, ${hit}/${p.ranks.length} teams matched`);
+      if (hit < 20) { console.warn(`Poll ${label}: too few teams matched, skipping`); continue; }
+      out.push({ key, label, name: p.name, date: p.date || p.ranks[0]?.date || '', ranks });
+    }
+    return out;
+  } catch (e) { console.warn('Polls unavailable:', e.message); return []; }
 }
 
 function verify(D) {
@@ -93,6 +118,16 @@ function verify(D) {
 }
 
 const fmtET = (d, opts) => new Date(d).toLocaleString('en-US', { timeZone: 'America/New_York', ...opts });
+// Header line naming the poll dates shown in the table. The CFP committee's first ranking comes out the first Tuesday of November.
+function pollMeta(polls, season) {
+  const day = d => (d ? fmtET(d, { month: 'short', day: 'numeric' }) : '');
+  const parts = polls.map(p => `<span>${p.label} = ${p.key === 'ap' ? 'AP poll' : 'CFP committee'} of <b>${day(p.date)}</b></span>`);
+  if (!polls.some(p => p.key === 'cfp')) {
+    const t = new Date(Date.UTC(season, 10, 1)); t.setUTCDate(1 + ((9 - t.getUTCDay()) % 7)); // first Tuesday of November
+    parts.push(`<span>CFP = committee rankings, first release <b>${t.toLocaleString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' })}</b></span>`);
+  }
+  return parts.join('');
+}
 function render(D) {
   const curWeek = Math.max(...D.games.map(g => g[0]));
   const prevWeek = curWeek - 1;
@@ -105,9 +140,10 @@ function render(D) {
     __PREVTHRU__: fmtET(prevEnd, { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }),
     __UPDATED__: fmtET(Date.now(), { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET',
     __PREVWEEK__: String(prevWeek),
+    __POLLMETA__: pollMeta(D.polls || [], D.season),
   };
   let page = fs.readFileSync(path.join(__dirname, 'page.html'), 'utf8');
-  const data = { teams: D.teams, names: D.names, conf: D.conf, games: D.games };
+  const data = { teams: D.teams, names: D.names, conf: D.conf, games: D.games, polls: (D.polls || []).map(p => ({ key: p.key, label: p.label, name: p.name, ranks: p.ranks })) };
   page = page.replace('__DATA__', () => JSON.stringify(data)).replace('__MODEL__', () => fs.readFileSync(path.join(__dirname, 'model.js'), 'utf8'));
   for (const [k, v] of Object.entries(meta)) page = page.split(k).join(v);
   if (/__[A-Z]+__/.test(page)) throw new Error('Unfilled placeholder: ' + page.match(/__[A-Z]+__/)[0]);

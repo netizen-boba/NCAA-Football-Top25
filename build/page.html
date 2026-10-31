@@ -50,6 +50,8 @@ tr.top4 .rk{color:var(--pylon)}
 .mv{font-weight:600;font-size:11.5px;width:38px}
 .mv.up{color:var(--up)} .mv.dn{color:var(--down)} .mv.eq{color:var(--muted)} .mv.new{color:var(--pylon)}
 .nr{color:var(--muted)}
+td.poll{font-weight:600;color:var(--turf)} td.poll.nr{font-weight:400;color:var(--muted)}
+th.poll{color:var(--turf)}
 .score{font-weight:600}
 .meter{display:inline-block;width:56px;height:6px;background:var(--rule);vertical-align:middle;margin-left:8px;position:relative}
 .meter i{position:absolute;inset:0 auto 0 0;background:var(--turf)}
@@ -115,7 +117,7 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
   <div class="eyebrow">NCAA FBS · __NTEAMS__ teams · __SEASON__ season</div>
   <h1>Gridiron <span>Index</span></h1>
   <p class="sub">A computer poll that starts from won-lost record, then adjusts for how good the opponents were, how good their opponents were, conference strength, who you actually beat, how well you played snap by snap, and how you played against the point spread.</p>
-  <div class="meta"><span>Results through <b>__ASOF__</b></span><span>Prev = through <b>__PREVTHRU__</b></span><span>Updated __UPDATED__</span></div>
+  <div class="meta"><span>Results through <b>__ASOF__</b></span><span>Prev = through <b>__PREVTHRU__</b></span><span>Updated __UPDATED__</span>__POLLMETA__</div>
 </header>
 
 <section style="display:grid;gap:12px">
@@ -127,12 +129,13 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
     </div>
   </div>
   <div class="tablebox"><table id="tbl"></table></div>
-  <div class="eyebrow" id="hint">Factor columns show points earned toward the score (weight × factor value). They add up to the score (within ±0.2 from rounding). Tap a team for its game log.</div>
+  <div class="eyebrow" id="hint">Factor columns show points earned toward the score (weight × factor value). They add up to the score (within ±0.2 from rounding). AP and CFP columns show that poll's rank for comparison; they don't feed the score. Tap a team for its game log.</div>
 </section>
 
 <section class="strip" aria-label="Bubble and drop-outs">
   <div class="stripgrp"><span class="striplab">On the bubble</span><div class="outs" id="next"></div></div>
   <div class="stripgrp"><span class="striplab">Dropped out</span><div class="outs" id="dropped"></div></div>
+  <div id="pollouts" style="display:contents"></div>
 </section>
 
 <section class="panel tune">
@@ -170,6 +173,7 @@ const D=__DATA__;
 __MODEL__
 const LABELS={wp:['Win %','Won-lost record, FCS wins discounted'],ypp:['Yards per play','Per-play edge vs what each opponent usually allows and gains'],ats:['Against the spread','Beat or missed the ESPN line, capped at 21'],owp:["Opponents' win %",'How good your opponents were'],oowp:["Opp. opponents' win %",'How good their schedules were'],conf:['Opp. conference strength','Non-conference record of opponents’ leagues'],mov:['Margin (capped)','Point differential, capped at 24'],qual:['Quality results','Top-25 wins, bad losses']};
 const PREV_WEEK=__PREVWEEK__, CUR_WEEK=99;
+const POLLS=D.polls||[];
 const FACTORS=[['wp','Win %','wp'],['owp','Opp W%','owp'],['oowp','Opp-opp W%','oowp'],['conf','Opp conf','oconf'],['ypp','Yds/play','ypp'],['ats','vs Spread','ats'],['mov','Margin','mov'],['qual','Quality','qual']];
 let W={...DEFAULT_W}, FCSW=DEFAULT_FCS_WIN, view='adj', open=new Set();
 const pct=x=>x.toFixed(3).replace(/^0/,'');
@@ -200,6 +204,8 @@ function columns(key,wn,prev){
     c('wl','W-L','desc',r=>r.rawWP*100+r.w,r=>`<td class="rec">${r.w}-${r.l}${r.fcsW?`<sup class="fcs" title="Includes ${r.fcsW} win over FCS">*</sup>`:''}</td>`),
     c('prev','Prev','asc',r=>pr(r),r=>`<td class="${pr(r)>25?'nr':''}">${pr(r)}</td>`),
   ];
+  // Outside polls (AP, CFP committee): rank, or a dash when unranked. Unranked sorts last.
+  for(const p of POLLS) cols.push(c(p.key,p.label,'asc',r=>p.ranks[r.t]||99,r=>p.ranks[r.t]?`<td class="poll">${p.ranks[r.t]}</td>`:`<td class="poll nr">–</td>`,'poll'));
   if(view==='adj'){
     cols.push(c('sos','SOS rk','asc',r=>r.sosRank,r=>`<td>${r.sosRank}</td>`));
     cols.push(c('ats','ATS','desc',r=>{const a=r.atsRec;return (a.c+a.p/2)/Math.max(1,a.c+a.x+a.p)*100+a.avg/100;},r=>{const a=r.atsRec;return `<td>${a.c}-${a.x}${a.p?'-'+a.p:''}</td>`;}));
@@ -235,6 +241,9 @@ function render(){
   document.getElementById('next').innerHTML=bub.map(r=>`<span><b>${r[key]}</b>${r.name} ${r.w}-${r.l}</span>`).join('');
   const drop=prev.filter(p=>p[key]<=25&&cur[p.t][key]>25).sort((a,b)=>a[key]-b[key]);
   document.getElementById('dropped').innerHTML=drop.length?drop.map(p=>`<span><b>${p[key]}→${cur[p.t][key]}</b>${p.name}</span>`).join(''):'<span>None</span>';
+  document.getElementById('pollouts').innerHTML=POLLS.map(p=>{
+    const miss=cur.filter(r=>p.ranks[r.t]&&r[key]>25).sort((a,b)=>p.ranks[a.t]-p.ranks[b.t]);
+    return `<div class="stripgrp"><span class="striplab">${p.label} top 25, not ours</span><div class="outs">${miss.length?miss.map(r=>`<span><b>${p.label} ${p.ranks[r.t]}</b>${r.name} (ours ${r[key]})</span>`).join(''):'<span>None</span>'}</div></div>`;}).join('');
 }
 function renderConf(){
   const rec=confStrength(D,CUR_WEEK);

@@ -61,6 +61,8 @@ tr.detail td{background:var(--turf-soft);white-space:normal;text-align:left;padd
 .log .w{color:var(--up);font-weight:600} .log .L{color:var(--down);font-weight:600}
 .log .o{flex:1;font-family:var(--body);font-size:13.5px;overflow:hidden;text-overflow:ellipsis}
 .log .orank{color:var(--muted)}
+.log div.projL{box-shadow:inset 3px 0 0 var(--down);padding-left:8px;background:var(--sheet)}
+.log .ptag{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--down);border:1px solid var(--down);border-radius:3px;padding:0 4px;align-self:center;white-space:nowrap}
 .log .ln{color:var(--muted);min-width:42px;text-align:right}
 td.pos{color:var(--up)} td.neg{color:var(--down)}
 .sortable button{all:unset;cursor:pointer;display:block;width:100%;text-align:inherit;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit}
@@ -195,11 +197,30 @@ const keyOf=()=>view==='adj'?'rank':view==='wl'?'wlRank':'projRank';
 // Projected record in whole games: round the expected wins, losses = games played + left minus that
 const projWL=r=>{const w=Math.round(r.pw);return `${w}-${Math.round(r.pw+r.pl)-w}`;};
 const pctTxt=x=>x>=0.995?'>99%':x>0&&x<0.005?'<1%':Math.round(x*100)+'%';
-function remaining(t,cur){
-  return FUT.map((g,i)=>[g,i]).filter(([g])=>g[1]===t||g[2]===t).map(([[w,h,a,neu,line],i])=>{
+// Projected losses still to come = projected losses minus losses so far.
+// They are pinned on the remaining games with the lowest win chances, so the highlighted games add up to the projected record.
+function projLosses(r){return Math.max(0,(Math.round(r.pw+r.pl)-Math.round(r.pw))-r.l);}
+function remainingGames(r){
+  const t=r.t;
+  const gs=FUT.map((g,i)=>[g,i]).filter(([g])=>g[1]===t||g[2]===t).map(([[w,h,a,neu,line],i],k)=>{
     const home=h===t, opp=home?a:h, p=home?PROJ.future[i]:1-PROJ.future[i];
-    const on=opp===null?'FCS opponent':D.names[opp], or=opp===null?'':`#${cur[opp].projRank}`;
-    return `<div><span class="${p>=0.5?'w':'L'}">${pctTxt(p)}</span><span class="o">${neu?'vs ':home?'':'@ '}${on} <span class="orank">${or}</span></span><span class="ln">${line!=null?'line '+((home?line:-line)>0?'+':'')+(home?line:-line):''}</span></div>`;}).join('')||'<div>No regular-season games left</div>';
+    return {k,w,home,opp,neu,line:line==null?null:(home?line:-line),p};});
+  const n=projLosses(r);
+  [...gs].sort((x,y)=>x.p-y.p||x.k-y.k).slice(0,n).forEach(g=>g.loss=true);
+  return gs;
+}
+function remaining(r,cur){
+  const gs=remainingGames(r);
+  return gs.map(g=>{
+    const on=g.opp===null?'FCS opponent':D.names[g.opp], or=g.opp===null?'':`#${cur[g.opp].projRank}`;
+    return `<div class="${g.loss?'projL':''}"><span class="${g.p>=0.5?'w':'L'}">${pctTxt(g.p)}</span><span class="o">${g.neu?'vs ':g.home?'':'@ '}${on} <span class="orank">${or}</span></span><span class="ln">${g.line!=null?'line '+(g.line>0?'+':'')+g.line:''}</span>${g.loss?'<span class="ptag">Proj. loss</span>':''}</div>`;}).join('')||'<div>No regular-season games left</div>';
+}
+function remainingNote(r){
+  const gs=remainingGames(r), n=gs.filter(g=>g.loss).length, left=gs.length;
+  if(!left) return '';
+  const pAll=gs.reduce((s,g)=>s*g.p,1);
+  const exp=gs.reduce((s,g)=>s+g.p,0);
+  return `Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)} · ${n?`Highlighted: the ${n===1?'game':n+' games'} most likely to be lost, which make up the projected ${projWL(r)}`:`Projected to win out (${projWL(r)})`}`;
 }
 function mvCell(now,before){
   if(before>25&&now<=25) return `<td class="mv new">NEW</td>`;
@@ -267,7 +288,7 @@ function render(){
     return `<th class="${c.cls} sortable${on?' sorted':''}" data-col="${c.id}" aria-sort="${on?(asc?'ascending':'descending'):'none'}"><button type="button" title="Sort by this column">${c.head.replace(/<span>/,`<i class="arr">${on?(asc?'▲':'▼'):''}</i><span>`)}${c.head.includes('<span>')?'':`<i class="arr">${on?(asc?'▲':'▼'):''}</i>`}</button></th>`;}).join('')+'</tr></thead><tbody>';
   for(const r of top){
     h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}">`+cols.map(c=>c.cell(r)).join('')+'</tr>';
-    if(open.has(r.t)&&view==='proj') h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Rating ${r.rating>0?'+':''}${r.rating.toFixed(1)} pts vs an average FBS team (#${r.ratingRank}) · Projected ${projWL(r)} · Average finish #${r.avgRank} · 80% range #${r.lo}–#${r.hi} · Top-25 odds ${pctTxt(r.top25)}${r.l===0||r.unbeaten>0?' · Unbeaten odds '+pctTxt(r.unbeaten):''}</div><div class="compline">Remaining games: win chance, opponent (projected rank), posted ESPN line</div><div class="log">${remaining(r.t,cur)}</div><div class="compline" style="margin-top:10px">Played</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+    if(open.has(r.t)&&view==='proj') h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Rating ${r.rating>0?'+':''}${r.rating.toFixed(1)} pts vs an average FBS team (#${r.ratingRank}) · Projected ${projWL(r)} · Average finish #${r.avgRank} · 80% range #${r.lo}–#${r.hi} · Top-25 odds ${pctTxt(r.top25)}${r.l===0||r.unbeaten>0?' · Unbeaten odds '+pctTxt(r.unbeaten):''}</div><div class="compline">Remaining games: win chance, opponent (projected rank), posted ESPN line</div><div class="compline">${remainingNote(r)}</div><div class="log">${remaining(r,cur)}</div><div class="compline" style="margin-top:10px">Played</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
     else if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} (#${r.atsRank}) · Yds/play ${r.yOff.toFixed(2)} off, ${r.yDef.toFixed(2)} allowed · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
   }
   document.getElementById('tbl').innerHTML=h+'</tbody>';

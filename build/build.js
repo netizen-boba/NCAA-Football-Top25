@@ -64,7 +64,7 @@ async function fetchData() {
       if (t.team.id === g.h) g.hy = y; else if (t.team.id === g.a) g.ay = y;
     }
   });
-  const conf = ([, v]) => { const k = v.pid === 80 || v.pid == null ? v.gid : v.pid; return CONF[k] || 'G' + k; };
+  const conf = ([, v]) => { const k = v.pid == null || Number(v.pid) === 80 ? Number(v.gid) : Number(v.pid); return CONF[k] || 'G' + k; };
   const D = {
     season, t0,
     teams: fbs.map(([, v]) => v.abbr),
@@ -86,6 +86,9 @@ function verify(D) {
   for (const [, h, hs, a, as] of D.games) { if (h !== null) wl[h][hs > as ? 0 : 1]++; if (a !== null) wl[a][as > hs ? 0 : 1]++; }
   const bad = D.teams.map((t, i) => [t, wl[i].join('-'), D.records[i]]).filter(([, mine, off]) => off && mine !== off);
   const noYpp = D.games.filter(g => g[1] !== null && g[3] !== null && (g[8] == null || g[9] == null)).length;
+  const unknownConf = [...new Set(D.conf.filter(c => !Object.values(CONF).includes(c)))];
+  const confSizes = {}; D.conf.forEach(c => (confSizes[c] = (confSizes[c] || 0) + 1));
+  if (unknownConf.length || Object.keys(confSizes).length < 8) bad.push(['conferences', JSON.stringify(confSizes), 'expected known FBS conferences']);
   return { bad, noYpp };
 }
 
@@ -124,7 +127,7 @@ function render(D) {
   const D = i > 0 ? JSON.parse(fs.readFileSync(process.argv[i + 1], 'utf8')) : await fetchData();
   const v = verify(D);
   console.log(`Teams ${D.teams.length}, games ${D.games.length}, last game ${D.lastDate}, games missing yards/play ${v.noYpp}`);
-  if (v.bad.length) { console.error('Record mismatch, not publishing:', JSON.stringify(v.bad.slice(0, 10))); process.exit(1); }
+  if (v.bad.length) { console.error('Check failed (records or conferences), not publishing:', JSON.stringify(v.bad.slice(0, 10))); process.exit(1); }
   if (i < 0) { fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true }); fs.writeFileSync(path.join(ROOT, 'data', 'latest.json'), JSON.stringify(D)); }
   const { meta, top } = render(D);
   console.log(JSON.stringify(meta)); console.log(top.join('\n'));

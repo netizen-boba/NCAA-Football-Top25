@@ -92,6 +92,18 @@ sup.fcs{color:var(--pylon);font-size:11px;margin-left:1px}
 .wrow output{font-family:var(--mono);font-size:13px;text-align:right}
 input[type=range]{width:100%;accent-color:var(--pylon)}
 .reset{font:600 13px var(--body);background:transparent;color:var(--ink);border:1.5px solid var(--rule-strong);border-radius:4px;padding:6px 12px;cursor:pointer;justify-self:start}
+.strip{display:flex;flex-wrap:wrap;gap:10px 28px;align-items:baseline;border-top:1.5px solid var(--rule-strong);border-bottom:1px solid var(--rule);padding-block:12px;margin-top:-12px}
+.stripgrp{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;min-width:0}
+.striplab{font-family:var(--display);font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:.02em}
+.strip .outs{font-size:13.5px;gap:4px 12px}
+.tune .weights{grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));column-gap:36px}
+.tune .wrow.fcsrow{border-top:0;padding-top:0}
+.fyi h3{font-family:var(--display);font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.02em;margin:0;line-height:1;color:var(--muted)}
+.fyi p,.fyi li{font-size:13px;line-height:1.4}
+.fyi .method ol{gap:5px}
+.fyi .crow{font-size:11.5px;grid-template-columns:44px 1fr 66px}
+.fyi .ctrack{height:8px}
+.fyi{border-top:1px solid var(--rule);padding-top:20px}
 .method ol{margin:0;padding-left:20px;display:grid;gap:8px;max-width:70ch}
 .method li b{font-weight:700}
 .foot{font-family:var(--mono);font-size:11.5px;color:var(--muted);border-top:1px solid var(--rule);padding-top:12px}
@@ -121,23 +133,25 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
   <div class="eyebrow" id="hint">Factor columns show points earned toward the score (weight × factor value). They add up to the score (±0.1 from rounding). Tap a team for its game log.</div>
 </section>
 
-<div class="below">
+<section class="strip" aria-label="Bubble and drop-outs">
+  <div class="stripgrp"><span class="striplab">On the bubble</span><div class="outs" id="next"></div></div>
+  <div class="stripgrp"><span class="striplab">Dropped out</span><div class="outs" id="dropped"></div></div>
+</section>
+
+<section class="panel tune">
+  <div class="bar"><h2>Tune the weights</h2><button class="reset" id="reset">Reset to defaults</button></div>
+  <p>Drag to change how much each factor counts. Rankings, movement, the factor columns and the bubble update instantly. Weights are rescaled to total 100%.</p>
+  <div class="weights" id="weights"></div>
+</section>
+
+<div class="below fyi">
   <section class="panel">
-    <h2>On the bubble</h2>
-    <div class="outs" id="next"></div>
-    <h2 style="margin-top:8px">Dropped out</h2>
-    <div class="outs" id="dropped"></div>
-  </section>
-  <section class="panel">
-    <h2>Conference strength</h2>
+    <h3>Conference strength</h3>
     <p>Non-conference record against FBS opponents. The dashed line is .500.</p>
     <div class="conf" id="conf"></div>
   </section>
-</div>
-
-<div class="below">
   <section class="panel method">
-    <h2>How it's built</h2>
+    <h3>How it's built</h3>
     <ol>
       <li><b>Win %.</b> A win over an FCS team counts as 0.4 of a win here. A loss to an FCS team counts in full. The W-L column shows the real record; * marks teams with an FCS win.</li>
       <li><b>Opponents' win % (OWP).</b> Each opponent's record, with its game against you removed so your result doesn't inflate or deflate it.</li>
@@ -148,12 +162,6 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
       <li><b>Quality results.</b> Bonus for wins over teams rated top 10, 11–25 and 26–50; penalty for losses to teams rated 51+ and to FCS teams.</li>
     </ol>
     <p>Default weights: win % 35, opponents' win % 25, opponents' opponents' win % 10, conference strength 10, against the spread 10, margin 5, quality results 5. FCS opponents are treated as a .300 team in a weak conference. SOS rank combines OWP and OOWP at 2:1.</p>
-  </section>
-  <section class="panel">
-    <h2>Tune the weights</h2>
-    <p>Drag to change how much each factor counts. Rankings, movement and the bubble update instantly. Weights are rescaled to total 100%.</p>
-    <div class="weights" id="weights"></div>
-    <button class="reset" id="reset">Reset to defaults</button>
   </section>
 </div>
 <div class="foot">Data: final scores and ESPN closing spreads (DraftKings) for all 575 completed games involving FBS teams. Records match official standings for all 138 teams.</div>

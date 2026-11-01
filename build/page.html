@@ -156,11 +156,12 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
   <section class="panel method">
     <h3>How the current Top 25 is built</h3>
     <ol>
-      <li><b>Win % (40%).</b> A win over an FCS team counts as 0.4 of a win here. A loss to an FCS team counts in full. The W-L column shows the real record; * marks teams with an FCS win.</li>
+      <li><b>Win % (35%).</b> A win over an FCS team counts as 0.4 of a win here. A loss to an FCS team counts in full. The W-L column shows the real record; * marks teams with an FCS win.</li>
       <li><b>Opponents' win % (25%).</b> Each opponent's record, with its game against you removed so your result doesn't inflate or deflate it.</li>
-      <li><b>Opponents' opponents' win % (10%).</b> The average of your opponents' win %. This catches a 6-1 opponent whose wins came against nobody.</li>
+      <li><b>Opponents' opponents' win % (5%).</b> The average of your opponents' win %. This catches a 6-1 opponent whose wins came against nobody.</li>
       <li><b>Opponent conference strength (10%).</b> Each conference is rated by its non-conference record vs FBS teams (shrunk toward .500 early). You get the average rating of your opponents' conferences.</li>
       <li><b>Quality results (10%).</b> Bonus for wins over teams rated top 10, 11–25 and 26–50; penalty for losses to teams rated 51+ and to FCS teams.</li>
+      <li><b>Upset losses (10%).</b> Extra cost for losing a game you were favored to win, scaled by the ESPN pregame line: nothing for losing as an underdog or in a pick'em, about 0.4 for losing as a 7.5-point favorite, 0.6 as a 13.5-point favorite, 0.8 as a 19.5-point favorite. Penalties add up; 1.5 points' worth of upset losses wipes out the factor.</li>
       <li><b>Margin (5%).</b> Point differential per game, capped at 24 so running up the score earns nothing extra. FCS games are discounted.</li>
     </ol>
     <p>This poll rewards results only. Stats that mainly predict future games, like yards per play and results against the point spread, feed the projection instead. With these weights the higher-ranked team won 82% of the FBS games already played. FCS opponents are treated as a .300 team in a weak conference. SOS rank combines opponents' and opponents' opponents' win % at 2:1.</p>
@@ -179,11 +180,11 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
 <script>
 const D=__DATA__;
 __MODEL__
-const LABELS={wp:['Win %','Won-lost record, FCS wins discounted'],ypp:['Yards per play','Per-play edge vs what each opponent usually allows and gains'],ats:['Against the spread','Beat or missed the ESPN line, capped at 21'],owp:["Opponents' win %",'How good your opponents were'],oowp:["Opp. opponents' win %",'How good their schedules were'],conf:['Opp. conference strength','Non-conference record of opponents’ leagues'],mov:['Margin (capped)','Point differential, capped at 24'],qual:['Quality results','Top-25 wins, bad losses']};
+const LABELS={wp:['Win %','Won-lost record, FCS wins discounted'],ypp:['Yards per play','Per-play edge vs what each opponent usually allows and gains'],ats:['Against the spread','Beat or missed the ESPN line, capped at 21'],owp:["Opponents' win %",'How good your opponents were'],oowp:["Opp. opponents' win %",'How good their schedules were'],conf:['Opp. conference strength','Non-conference record of opponents’ leagues'],mov:['Margin (capped)','Point differential, capped at 24'],qual:['Quality results','Top-25 wins, bad losses'],ups:['Upset losses','Extra cost for losing as the favorite, by the ESPN line']};
 const PREV_WEEK=__PREVWEEK__, CUR_WEEK=99;
 const POLLS=D.polls||[];
 const HINT=document.getElementById('hint').innerHTML;
-const FACTORS=[['wp','Win %','wp'],['owp','Opp W%','owp'],['oowp','Opp-opp W%','oowp'],['conf','Opp conf','oconf'],['qual','Quality','qual'],['mov','Margin','mov'],['ypp','Yds/play','ypp'],['ats','vs Spread','ats']].filter(f=>f[0] in DEFAULT_W);
+const FACTORS=[['wp','Win %','wp'],['owp','Opp W%','owp'],['oowp','Opp-opp W%','oowp'],['conf','Opp conf','oconf'],['qual','Quality','qual'],['ups','Upset L','ups'],['mov','Margin','mov'],['ypp','Yds/play','ypp'],['ats','vs Spread','ats']].filter(f=>f[0] in DEFAULT_W);
 let W={...DEFAULT_W}, FCSW=DEFAULT_FCS_WIN, view='adj', open=new Set();
 const pct=x=>x.toFixed(3).replace(/^0/,'');
 function norm(w){const s=Object.values(w).reduce((a,b)=>a+b,0)||1;const o={};for(const k in w)o[k]=w[k]/s;return o;}
@@ -285,7 +286,7 @@ function render(){
   for(const r of top){
     h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}">`+cols.map(c=>c.cell(r)).join('')+'</tr>';
     if(open.has(r.t)&&view==='proj') h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Rating ${r.rating>0?'+':''}${r.rating.toFixed(1)} pts vs an average FBS team (#${r.ratingRank}) · Yds/play ${r.yOff.toFixed(2)} gained, ${r.yDef.toFixed(2)} allowed · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} · Projected ${projWL(r)} · Average finish #${r.avgRank} · 80% range #${r.lo}–#${r.hi} · Top-25 odds ${pctTxt(r.pTop25)}${r.l===0||r.unbeaten>0?' · Unbeaten odds '+pctTxt(r.unbeaten):''}</div><div class="compline">Remaining games: win chance, opponent (projected rank), posted ESPN line</div><div class="compline">${remainingNote(r)}</div><div class="log">${remaining(r,cur)}</div><div class="compline" style="margin-top:10px">Played</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
-    else if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+    else if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Upset losses: ${r.upsList&&r.upsList.length?r.upsList.map(([o,l,v])=>`${D.names[o]} (favored by ${-l}, −${v})`).join(', '):'none'} · Adj. win% ${pct(r.wp)} · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
   }
   document.getElementById('tbl').innerHTML=h+'</tbody>';
   document.getElementById('tblTitle').textContent=view==='adj'?'Top 25':view==='wl'?'Top 25 · record only':'Projected final Top 25';

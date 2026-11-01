@@ -4,7 +4,10 @@
 // v4 (Nov 2026): reactive / resume poll. Ranks what teams have earned: record, schedule, quality of wins and losses, margin.
 // Predictive stats (yards per play, results vs the spread) moved to the projection (predict.js). The model can still
 // score ypp/ats if they are passed in W, but the default poll leaves them out.
-const DEFAULT_W = { wp: 0.40, owp: 0.25, oowp: 0.10, conf: 0.10, mov: 0.05, qual: 0.10 }; // sums to 1
+const DEFAULT_W = { wp: 0.35, owp: 0.25, oowp: 0.05, conf: 0.10, mov: 0.05, qual: 0.10, ups: 0.10 }; // sums to 1
+// Upset losses: each loss costs max(0, 2p-1), p = the team's pregame win chance from its ESPN line (sigma 15).
+// Factor = 1 - (sum of penalties)/UPS_SCALE, floored at 0. No penalty for losing as an underdog or in a pick'em.
+const UPS_SCALE = 1.5, UPS_SIGMA = 15;
 const DEFAULT_FCS_WIN = 0.4;               // an FCS win counts as 0.4 of a game won (losses count in full)
 const FCS_WP = 0.30, FCS_CONF = 0.20, MOV_CAP = 24, ATS_CAP = 21, CONF_PRIOR = 4;
 
@@ -57,8 +60,11 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
     if (X.yppAdj) { if (g.opp === null) return [0, 0]; return [clip((g.yf - defA[g.opp]) + (offA[g.opp] - g.ya), 4) / 4, rec(g)]; }
     return [clip(g.yf - g.ya, 3) / 3, gw(g)];
   })) + 1) / 2);
-  const keys = ['wp', 'owp', 'oowp', 'conf', 'ats', 'mov', 'ypp'].filter(k => W[k] != null);
-  const comp = t => ({ wp: WP[t], owp: OWP[t], oowp: OOWP[t], conf: OCONF[t], ats: ATS[t], mov: MOV[t], ypp: YPP[t] });
+  const PhiU = z => { const t = 1 / (1 + 0.3275911 * Math.abs(z / Math.SQRT2)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z / 2); return 0.5 * (1 + (z >= 0 ? y : -y)); };
+  const UPSD = sched.map(s => { let pen = 0; const list = []; for (const g of s) { if (win(g) || g.opp === null || !g.line) continue; const p = PhiU(-g.line / UPS_SIGMA), v = Math.max(0, 2 * p - 1); if (v > 0) { pen += v; list.push([g.opp, g.line, Math.round(100 * v) / 100]); } } return { pen, list }; });
+  const UPS = UPSD.map(x => Math.max(0, 1 - x.pen / UPS_SCALE));
+  const keys = ['wp', 'owp', 'oowp', 'conf', 'ats', 'mov', 'ypp', 'ups'].filter(k => W[k] != null);
+  const comp = t => ({ wp: WP[t], owp: OWP[t], oowp: OOWP[t], conf: OCONF[t], ats: ATS[t], mov: MOV[t], ypp: YPP[t], ups: UPS[t] });
   const noQ = keys.reduce((s, k) => s + W[k], 0) || 1;
   const base = WP.map((_, t) => { const c = comp(t); return keys.reduce((s, k) => s + W[k] * c[k], 0) / noQ; });
   const baseRank = ranks(base);
@@ -81,7 +87,7 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
     t, abbr, name: D.names[t], conf: D.conf[t], w: wl[t][0], l: wl[t][1],
     fcsW: sched[t].filter(g => g.opp === null && win(g)).length,
     wp: WP[t], rawWP: rawWP[t], owp: OWP[t], oowp: OOWP[t], oconf: OCONF[t], mov: MOV[t], ats: ATS[t], atsRec: ATSR[t],
-    ypp: YPP[t], yOff: offA[t], yDef: defA[t], qual: QUAL[t], top25: QG[t].top25, bad: QG[t].bad, score: score[t],
+    ups: UPS[t], upsList: UPSD[t].list, ypp: YPP[t], yOff: offA[t], yDef: defA[t], qual: QUAL[t], top25: QG[t].top25, bad: QG[t].bad, score: score[t],
     rank: rank[t], sosRank: sosRank[t], wlRank: wlRank[t], atsRank: atsRank[t]
   }));
 }

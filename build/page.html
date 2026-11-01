@@ -196,7 +196,7 @@ const keyOf=()=>view==='adj'?'rank':view==='wl'?'wlRank':'projRank';
 // Projected record = current record + the projected winner of each remaining game (one league-wide pick per game)
 const projWL=r=>`${r.pw}-${r.pl}`;
 const pctTxt=x=>x>=0.995?'>99%':x>0&&x<0.005?'<1%':Math.round(x*100)+'%';
-// Each remaining game has ONE projected winner, picked league-wide in the build (PROJ.pick: 1 = home team wins),
+// Each remaining game has ONE projected winner, the favorite (PROJ.pick: 1 = home team wins),
 // so a game can never show as a loss, or a win, for both teams.
 function remainingGames(r){
   const t=r.t;
@@ -216,8 +216,7 @@ function remainingNote(r){
   if(!left) return '';
   const pAll=gs.reduce((s,g)=>s*g.p,1);
   const exp=gs.reduce((s,g)=>s+g.p,0);
-  const up=gs.filter(g=>(g.loss&&g.p>=0.5)||(!g.loss&&g.p<0.5)).length;
-  return `Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)} · ${n?`Projected ${projWL(r)}: highlighted ${n===1?'game is the projected loss':n+' games are the projected losses'}`:`Projected to win out (${projWL(r)})`}${up?` · ${up===1?'1 pick goes':up+' picks go'} against the favorite so the league's projected records add up`:''}`;
+  return `Projected ${projWL(r)} picks the favorite in each game${n?` (highlighted: ${n===1?'the game':'the '+n+' games'} where ${n===1?'the opponent is':'opponents are'} favored)`:', so a projected win-out'} · Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)}`;
 }
 function mvCell(now,before){
   if(before>25&&now<=25) return `<td class="mv new">NEW</td>`;

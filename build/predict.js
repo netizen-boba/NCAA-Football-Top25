@@ -148,6 +148,19 @@ function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
     for (const [, h, hs, a, as] of D.games) { if (h !== null && hs > as) won[h]++; if (a !== null && as > hs) won[a]++; }
     fut.forEach((g, i) => { const w = out.pick[i] ? g[1] : g[2]; if (w !== null) won[w]++; });
     out.teams.forEach((x, t) => { x.pw = won[t]; x.left = fut.filter(g => g[1] === t || g[2] === t).length; });
+    // Projected finish = the current-Top-25 formula applied to this one season (every favorite wins, by its
+    // predicted margin), so a team's projected rank always matches its projected W-L. The simulations above
+    // still supply the rank range, Top-25 odds and unbeaten odds.
+    const games = D.games.slice();
+    base.forEach((g, i) => {
+      const hi = ix(g.h), ai = ix(g.a), homeWins = out.pick[i] === 1;
+      let m = Math.max(1, Math.round(Math.abs(g.mean))); if (!homeWins) m = -m;
+      const T = (av[hi].pf + av[ai].pa + av[ai].pf + av[hi].pa) / 2;
+      let hs = Math.round((T + m) / 2), as = hs - m; if (as < 0) { hs -= as; as = 0; } if (hs < 0) { as -= hs; hs = 0; }
+      const hy = +((av[hi].yf + av[ai].ya) / 2).toFixed(3), ay = +((av[ai].yf + av[hi].ya) / 2).toFixed(3);
+      games.push([g.w, g.h, hs, g.a, as, -g.mean, g.neu, 0, hy, ay]);
+    });
+    for (const r of rankModel({ teams: D.teams, names: D.names, conf: D.conf, games }, 99)) out.teams[r.t].projRank = r.rank;
   }
   return out;
 }

@@ -189,7 +189,7 @@ const pct=x=>x.toFixed(3).replace(/^0/,'');
 function norm(w){const s=Object.values(w).reduce((a,b)=>a+b,0)||1;const o={};for(const k in w)o[k]=w[k]/s;return o;}
 const PROJ=D.proj||null, FUT=D.future||[];
 function compute(){const w=norm(W);const cur=rankModel(D,CUR_WEEK,w,FCSW);
-  if(PROJ)for(const r of cur){const x=PROJ.teams[r.t];Object.assign(r,x,{w:r.w,l:r.l,pw:x.w,pl:x.l,nowRank:r.rank});}
+  if(PROJ)for(const r of cur){const x=PROJ.teams[r.t];Object.assign(r,x,{w:r.w,l:r.l,top25:r.top25,pw:x.w,pl:x.l,pTop25:x.top25,nowRank:r.rank});}
   return {cur,prev:rankModel(D,PREV_WEEK,w,FCSW)};}
 const keyOf=()=>view==='adj'?'rank':view==='wl'?'wlRank':'projRank';
 // Projected record in whole games: round the expected wins, losses = games played + left minus that
@@ -252,7 +252,7 @@ function columns(key,wn,prev){
   for(const p of POLLS) cols.push(c(p.key,p.label,'asc',r=>p.ranks[r.t]||99,r=>p.ranks[r.t]?`<td class="poll">${p.ranks[r.t]}</td>`:`<td class="poll nr">–</td>`,'poll'));
   if(view==='proj'){
     cols.push(c('range','Likely rk<span>80% range</span>','asc',r=>r.lo+r.hi/1000,r=>`<td>${r.lo}–${r.hi}</td>`));
-    cols.push(c('top25','Top 25<span>odds</span>','desc',r=>r.top25,r=>`<td>${pctTxt(r.top25)}</td>`));
+    cols.push(c('top25','Top 25<span>odds</span>','desc',r=>r.pTop25,r=>`<td>${pctTxt(r.pTop25)}</td>`));
     cols.push(c('unb','Unbeaten<span>odds</span>','desc',r=>r.unbeaten,r=>r.l===0||r.unbeaten>0?`<td>${pctTxt(r.unbeaten)}</td>`:`<td class="nr">–</td>`));
     cols.push(c('rating','Rating<span>pts vs avg</span>','desc',r=>r.rating,r=>`<td class="score">${r.rating>0?'+':''}${r.rating.toFixed(1)}</td>`));
     cols.push(c('ratingRk','Rating rk','asc',r=>r.ratingRank,r=>`<td>${r.ratingRank}</td>`));
@@ -286,7 +286,7 @@ function render(){
     return `<th class="${c.cls} sortable${on?' sorted':''}" data-col="${c.id}" aria-sort="${on?(asc?'ascending':'descending'):'none'}"><button type="button" title="Sort by this column">${c.head.replace(/<span>/,`<i class="arr">${on?(asc?'▲':'▼'):''}</i><span>`)}${c.head.includes('<span>')?'':`<i class="arr">${on?(asc?'▲':'▼'):''}</i>`}</button></th>`;}).join('')+'</tr></thead><tbody>';
   for(const r of top){
     h+=`<tr class="trow${r[key]<=4?' top4':''}" tabindex="0" data-t="${r.t}" aria-expanded="${open.has(r.t)}">`+cols.map(c=>c.cell(r)).join('')+'</tr>';
-    if(open.has(r.t)&&view==='proj') h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Rating ${r.rating>0?'+':''}${r.rating.toFixed(1)} pts vs an average FBS team (#${r.ratingRank}) · Yds/play ${r.yOff.toFixed(2)} gained, ${r.yDef.toFixed(2)} allowed · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} · Projected ${projWL(r)} · Average finish #${r.avgRank} · 80% range #${r.lo}–#${r.hi} · Top-25 odds ${pctTxt(r.top25)}${r.l===0||r.unbeaten>0?' · Unbeaten odds '+pctTxt(r.unbeaten):''}</div><div class="compline">Remaining games: win chance, opponent (projected rank), posted ESPN line</div><div class="compline">${remainingNote(r)}</div><div class="log">${remaining(r,cur)}</div><div class="compline" style="margin-top:10px">Played</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
+    if(open.has(r.t)&&view==='proj') h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Rating ${r.rating>0?'+':''}${r.rating.toFixed(1)} pts vs an average FBS team (#${r.ratingRank}) · Yds/play ${r.yOff.toFixed(2)} gained, ${r.yDef.toFixed(2)} allowed · ATS avg ${r.atsRec.avg>=0?'+':''}${r.atsRec.avg.toFixed(1)} · Projected ${projWL(r)} · Average finish #${r.avgRank} · 80% range #${r.lo}–#${r.hi} · Top-25 odds ${pctTxt(r.pTop25)}${r.l===0||r.unbeaten>0?' · Unbeaten odds '+pctTxt(r.unbeaten):''}</div><div class="compline">Remaining games: win chance, opponent (projected rank), posted ESPN line</div><div class="compline">${remainingNote(r)}</div><div class="log">${remaining(r,cur)}</div><div class="compline" style="margin-top:10px">Played</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
     else if(open.has(r.t)) h+=`<tr class="detail"><td colspan="${cols.length}"><div class="compline">Record-only rank #${r.wlRank} · Top-25 wins ${r.top25} · Adj. win% ${pct(r.wp)} · OWP ${pct(r.owp)} · OOWP ${pct(r.oowp)} · Opp conf ${pct(r.oconf)} · Margin ${pct(r.mov)} · Quality ${pct(r.qual)} · Bad losses ${r.bad}</div><div class="log">${gameLog(r.t,cur)}</div></td></tr>`;
   }
   document.getElementById('tbl').innerHTML=h+'</tbody>';

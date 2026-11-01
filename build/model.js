@@ -1,8 +1,10 @@
 // Gridiron Index ranking model.
 // games: [week, homeIdx|null, homePts, awayIdx|null, awayPts, homeSpread, neutral]; null = FCS team.
 // homeSpread is ESPN's (DraftKings) line for the home team: negative = home favored.
-// v3: v2 weights plus opponent-adjusted yards per play (0.30 raw = 23% after normalizing). Backtested on 2024-25.
-const DEFAULT_W = { wp: 0.27, owp: 0.19, oowp: 0.08, conf: 0.08, ypp: 0.23, ats: 0.08, mov: 0.04, qual: 0.03 }; // sums to 1; rounded from the tested mix
+// v4 (Nov 2026): reactive / resume poll. Ranks what teams have earned: record, schedule, quality of wins and losses, margin.
+// Predictive stats (yards per play, results vs the spread) moved to the projection (predict.js). The model can still
+// score ypp/ats if they are passed in W, but the default poll leaves them out.
+const DEFAULT_W = { wp: 0.40, owp: 0.25, oowp: 0.10, conf: 0.10, mov: 0.05, qual: 0.10 }; // sums to 1
 const DEFAULT_FCS_WIN = 0.4;               // an FCS win counts as 0.4 of a game won (losses count in full)
 const FCS_WP = 0.30, FCS_CONF = 0.20, MOV_CAP = 24, ATS_CAP = 21, CONF_PRIOR = 4;
 

@@ -128,7 +128,7 @@ function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
   const remOrder = remAvg.map((v, i) => i).filter(i => remAvg[i] != null).sort((x, y) => remAvg[y] - remAvg[x]);
   const remRank = new Array(n).fill(null); remOrder.forEach((t, k) => (remRank[t] = k + 1));
   const r1 = v => Math.round(v * 10) / 10;
-  return {
+  const out = {
     sims: nSims, sigma: o.sigma, hfa: r1(R.hfa), fcs: r1(R.r[n]),
     teams: D.teams.map((_, t) => ({
       rating: r1(R.r[t]), ratingRank: ratingRank[t], projRank: projRank[t], avgRank: r1(avgRank[t]),
@@ -139,6 +139,52 @@ function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
     // Win probability for the home team in each remaining game, same order as D.future
     future: base.map(g => Math.round(1000 * g.p) / 1000),
   };
+  {
+    const fut = D.future.map(g => g.slice(0, 5));
+    const pk = pickWinners(D, fut, out.future, out.teams);
+    out.pick = pk.homeWins; // 1 = home team is the projected winner, 0 = away team
+    out.teams.forEach((x, t) => { x.pw = pk.wins[t] + pk.got[t]; x.left = fut.filter(g => g[1] === t || g[2] === t).length; });
+  }
+  return out;
 }
 
-module.exports = { P_DEFAULTS, rate, predict, simulate, Phi };
+
+// One projected winner per remaining game, chosen league-wide so both teams' views of a game always agree.
+// Goal 1: each team's projected wins in its remaining games come as close as possible to its expected wins
+//         (rounded expected season wins minus wins so far).
+// Goal 2 (tie-break): among those, the most likely set of results (maximize the product of win chances).
+// Solved exactly as a min-cost flow: each game sends one "win" to one of its two teams.
+function pickWinners(D, future, pHome, teamProj) {
+  const n = D.teams.length;
+  const wins = D.teams.map(() => 0);
+  for (const [, h, hs, a, as] of D.games) { if (h !== null && hs > as) wins[h]++; if (a !== null && as > hs) wins[a]++; }
+  const left = D.teams.map(() => 0);
+  future.forEach(g => { if (g[1] !== null) left[g[1]]++; if (g[2] !== null) left[g[2]]++; });
+  const target = D.teams.map((_, t) => Math.max(0, Math.min(left[t], Math.round(teamProj[t].w) - wins[t])));
+  const G = future.length, S = 0, gNode = i => 1 + i, tNode = t => 1 + G + t, FCS = 1 + G + n, T = FCS + 1, N = T + 1;
+  const to = [], cap = [], cost = [], head = new Array(N).fill(-1), nxt = [];
+  const add = (u, v, c, w) => { for (const [x, y, cc, ww] of [[u, v, c, w], [v, u, 0, -w]]) { to.push(y); cap.push(cc); cost.push(ww); nxt.push(head[x]); head[x] = to.length - 1; } };
+  const BIG = 1e7, lp = p => Math.round(-1000 * Math.log(Math.min(Math.max(p, 1e-6), 1 - 1e-6)));
+  future.forEach((g, i) => {
+    add(S, gNode(i), 1, 0);
+    add(gNode(i), g[1] === null ? FCS : tNode(g[1]), 1, lp(pHome[i]));
+    add(gNode(i), g[2] === null ? FCS : tNode(g[2]), 1, lp(1 - pHome[i]));
+  });
+  for (let t = 0; t < n; t++) for (let k = 1; k <= left[t]; k++) add(tNode(t), T, 1, k <= target[t] ? -BIG : BIG);
+  add(FCS, T, G, 0);
+  // Successive shortest paths (Bellman-Ford; the starting graph has no cycles, so no negative cycles arise)
+  for (let f = 0; f < G; f++) {
+    const dist = new Array(N).fill(Infinity), pe = new Array(N).fill(-1); dist[S] = 0;
+    for (let it = 0, changed = true; changed && it < N; it++) { changed = false;
+      for (let u = 0; u < N; u++) if (dist[u] < Infinity) for (let e = head[u]; e !== -1; e = nxt[e])
+        if (cap[e] > 0 && dist[u] + cost[e] < dist[to[e]]) { dist[to[e]] = dist[u] + cost[e]; pe[to[e]] = e; changed = true; } }
+    if (dist[T] === Infinity) throw new Error('pickWinners: no path');
+    for (let v = T; v !== S; v = to[pe[v] ^ 1]) { cap[pe[v]]--; cap[pe[v] ^ 1]++; }
+  }
+  const homeWins = future.map((g, i) => { for (let e = head[gNode(i)]; e !== -1; e = nxt[e]) if (e % 2 === 0 && cap[e] === 0) return to[e] === (g[1] === null ? FCS : tNode(g[1])) ? 1 : 0; throw new Error('pickWinners: game ' + i + ' unassigned'); });
+  const got = D.teams.map(() => 0);
+  future.forEach((g, i) => { const w = homeWins[i] ? g[1] : g[2]; if (w !== null) got[w]++; });
+  return { homeWins, target, got, wins };
+}
+
+module.exports = { P_DEFAULTS, rate, predict, simulate, Phi, pickWinners };

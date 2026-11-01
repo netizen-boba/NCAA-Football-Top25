@@ -189,23 +189,21 @@ const pct=x=>x.toFixed(3).replace(/^0/,'');
 function norm(w){const s=Object.values(w).reduce((a,b)=>a+b,0)||1;const o={};for(const k in w)o[k]=w[k]/s;return o;}
 const PROJ=D.proj||null, FUT=D.future||[];
 function compute(){const w=norm(W);const cur=rankModel(D,CUR_WEEK,w,FCSW);
-  if(PROJ)for(const r of cur){const x=PROJ.teams[r.t];Object.assign(r,x,{w:r.w,l:r.l,top25:r.top25,pw:x.w,pl:x.l,pTop25:x.top25,nowRank:r.rank});}
+  if(PROJ)for(const r of cur){const x=PROJ.teams[r.t];Object.assign(r,x,{w:r.w,l:r.l,top25:r.top25,pw:x.pw,pl:r.w+r.l+x.left-x.pw,expW:x.w,pTop25:x.top25,nowRank:r.rank});}
   return {cur,prev:rankModel(D,PREV_WEEK,w,FCSW)};}
 const keyOf=()=>view==='adj'?'rank':view==='wl'?'wlRank':'projRank';
 // Projected record in whole games: round the expected wins, losses = games played + left minus that
-const projWL=r=>{const w=Math.round(r.pw);return `${w}-${Math.round(r.pw+r.pl)-w}`;};
+// Projected record = current record + the projected winner of each remaining game (one league-wide pick per game)
+const projWL=r=>`${r.pw}-${r.pl}`;
 const pctTxt=x=>x>=0.995?'>99%':x>0&&x<0.005?'<1%':Math.round(x*100)+'%';
-// Projected losses still to come = projected losses minus losses so far.
-// They are pinned on the remaining games with the lowest win chances, so the highlighted games add up to the projected record.
-function projLosses(r){return Math.max(0,(Math.round(r.pw+r.pl)-Math.round(r.pw))-r.l);}
+// Each remaining game has ONE projected winner, picked league-wide in the build (PROJ.pick: 1 = home team wins),
+// so a game can never show as a loss, or a win, for both teams.
 function remainingGames(r){
   const t=r.t;
-  const gs=FUT.map((g,i)=>[g,i]).filter(([g])=>g[1]===t||g[2]===t).map(([[w,h,a,neu,line],i],k)=>{
+  return FUT.map((g,i)=>[g,i]).filter(([g])=>g[1]===t||g[2]===t).map(([[w,h,a,neu,line],i],k)=>{
     const home=h===t, opp=home?a:h, p=home?PROJ.future[i]:1-PROJ.future[i];
-    return {k,w,home,opp,neu,line:line==null?null:(home?line:-line),p};});
-  const n=projLosses(r);
-  [...gs].sort((x,y)=>x.p-y.p||x.k-y.k).slice(0,n).forEach(g=>g.loss=true);
-  return gs;
+    const won=home?PROJ.pick[i]===1:PROJ.pick[i]===0;
+    return {k,w,home,opp,neu,line:line==null?null:(home?line:-line),p,loss:!won};});
 }
 function remaining(r,cur){
   const gs=remainingGames(r);
@@ -218,7 +216,8 @@ function remainingNote(r){
   if(!left) return '';
   const pAll=gs.reduce((s,g)=>s*g.p,1);
   const exp=gs.reduce((s,g)=>s+g.p,0);
-  return `Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)} · ${n?`Highlighted: the ${n===1?'game':n+' games'} most likely to be lost, which make up the projected ${projWL(r)}`:`Projected to win out (${projWL(r)})`}`;
+  const up=gs.filter(g=>(g.loss&&g.p>=0.5)||(!g.loss&&g.p<0.5)).length;
+  return `Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)} · ${n?`Projected ${projWL(r)}: highlighted ${n===1?'game is the projected loss':n+' games are the projected losses'}`:`Projected to win out (${projWL(r)})`}${up?` · ${up===1?'1 pick goes':up+' picks go'} against the favorite so the league's projected records add up`:''}`;
 }
 function mvCell(now,before){
   if(before>25&&now<=25) return `<td class="mv new">NEW</td>`;

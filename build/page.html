@@ -170,7 +170,7 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
       <li><b>Team ratings in points.</b> Half comes from performance: opponent-adjusted scoring margin (capped at 28 a game) and opponent-adjusted yards per play, converted to points, weighted 1:3 because yards per play predicted better. The other half comes from the betting market: the team strengths that best explain the ESPN point spreads of games already played. Home field is worth about 3 points.</li>
       <li><b>Win chance for each remaining game.</b> From the rating gap, assuming real margins land within about 15 points of the prediction two times in three. When ESPN has posted a line for the game, the line is used instead.</li>
       <li><b>Simulate the rest of the season.</b> Every remaining regular-season game is played out thousands of times, with each team's rating also allowed to be a bit off in each run. This gives the Top 25 odds, unbeaten odds and the 80% range of final ranks.</li>
-      <li><b>Rank the projected season.</b> The projected W-L gives each remaining game to the favorite. That one finished season is ranked by the current-Top-25 formula at its default weights, so a team's projected rank always matches its projected record. The forecast answers: where would this team's résumé stand if every favorite wins? An underdog that wins some of its games can finish well above its projected rank, and the sim range shows how far.</li>
+      <li><b>Rank the projected season.</b> The projected W-L is one typical season. It starts with every favorite winning, then hands games to the underdog, choosing the likeliest upsets, until each team's record is within about one game of its expected wins (the sum of its win chances). About a third of remaining games are expected to go to the underdog, so the projection includes upsets rather than having favorites win out. That season is ranked by the current-Top-25 formula at its default weights, so a team's projected rank always matches its projected record. The sim range shows how far a team could rise or fall.</li>
     </ol>
     <p>Tested on 2026 games, fitting only on earlier weeks (weeks 4–9, 308 games): the ratings picked 66% of winners, and the ESPN line picked 72%. That gap narrowed from early October onward as the ratings got more games, which is why posted lines are used for next week's games.</p>
   </section>
@@ -198,7 +198,7 @@ const keyOf=()=>view==='adj'?'rank':view==='wl'?'wlRank':'projRank';
 // Projected record = current record + the projected winner of each remaining game (one league-wide pick per game)
 const projWL=r=>`${r.pw}-${r.pl}`;
 const pctTxt=x=>x>=0.995?'>99%':x>0&&x<0.005?'<1%':Math.round(x*100)+'%';
-// Each remaining game has ONE projected winner, the favorite (PROJ.pick: 1 = home team wins),
+// Each remaining game has ONE projected winner (PROJ.pick: 1 = home team wins), from the typical season,
 // so a game can never show as a loss, or a win, for both teams.
 function remainingGames(r){
   const t=r.t;
@@ -218,7 +218,8 @@ function remainingNote(r){
   if(!left) return '';
   const pAll=gs.reduce((s,g)=>s*g.p,1);
   const exp=gs.reduce((s,g)=>s+g.p,0);
-  return `Projected ${projWL(r)} picks the favorite in each game${n?` (highlighted: ${n===1?'the game':'the '+n+' games'} where ${n===1?'the opponent is':'opponents are'} favored)`:', so a projected win-out'} · Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)}`;
+  const up=gs.filter(g=>g.p<0.5&&!g.loss).length, dn=gs.filter(g=>g.p>=0.5&&g.loss).length;
+  return `Projected ${projWL(r)}${n?` (highlighted: projected ${n===1?'loss':'losses'})`:', a projected win-out'}${up||dn?` · includes ${[up?`${up} upset ${up===1?'win':'wins'}`:'',dn?`${dn} upset ${dn===1?'loss':'losses'}`:''].filter(Boolean).join(' and ')}`:''} · Expected wins in these ${left} games: ${exp.toFixed(1)} (sum of the win chances) · Chance of winning all ${left}: ${pctTxt(pAll)}`;
 }
 function mvCell(now,before){
   if(before>25&&now<=25) return `<td class="mv new">NEW</td>`;

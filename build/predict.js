@@ -75,6 +75,7 @@ function mulberry32(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5)
 function gauss(rnd) { let u = 0; while (!u) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
 
 // Simulate the remaining regular season nSims times; each finished season is ranked by the reactive model.
+const UPSET_LAMBDA = 0.5;
 function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
   const R = rate(D, 99, o), n = D.teams.length, rnd = mulberry32(seed);
   const fut = D.future || [];
@@ -141,20 +142,40 @@ function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
   };
   {
     const fut = D.future.map(g => g.slice(0, 5));
-    // Game-by-game: the favorite (win chance >= 50%, home team on an exact 50-50) is the projected winner of each game,
-    // so every game has exactly one winner and the league's projected records always add up.
-    out.pick = out.future.map(ph => (ph >= 0.5 ? 1 : 0)); // 1 = home team wins, 0 = away team
+    // Favorite = win chance >= 50% (home team on an exact 50-50).
+    // Typical season (Bob's choice, Nov 2, 2026): start with every favorite winning, then flip games to the underdog
+    // where that brings both teams' projected wins closer to their expected wins (current wins + sum of win chances),
+    // charging UPSET_LAMBDA x -log(chance) for picking the less likely result. Upsets land in the most plausible games
+    // and every team's projected record stays within about one game of its expected wins. One winner per game.
+    const pf = out.future, wins0 = D.teams.map(() => 0);
+    for (const [, h, hs, a, as] of D.games) { if (h !== null && hs > as) wins0[h]++; if (a !== null && as > hs) wins0[a]++; }
+    const E = wins0.slice(); fut.forEach((g, i) => { if (g[1] !== null) E[g[1]] += pf[i]; if (g[2] !== null) E[g[2]] += 1 - pf[i]; });
+    const hw = pf.map(ph => ph >= 0.5), W = wins0.slice();
+    fut.forEach((g, i) => { const w = hw[i] ? g[1] : g[2]; if (w !== null) W[w]++; });
+    const dev = t => (t === null ? 0 : (W[t] - E[t]) ** 2), cost = (i, h) => -Math.log(Math.max(1e-6, h ? pf[i] : 1 - pf[i]));
+    for (let it = 0, changed = true; changed && it < 50; it++) {
+      changed = false;
+      fut.forEach(([, h, a], i) => {
+        const before = dev(h) + dev(a) + UPSET_LAMBDA * cost(i, hw[i]), d = hw[i] ? -1 : 1;
+        if (h !== null) W[h] += d; if (a !== null) W[a] -= d;
+        if (dev(h) + dev(a) + UPSET_LAMBDA * cost(i, !hw[i]) < before - 1e-9) { hw[i] = !hw[i]; changed = true; }
+        else { if (h !== null) W[h] -= d; if (a !== null) W[a] += d; }
+      });
+    }
+    out.pick = hw.map(h => (h ? 1 : 0)); // 1 = home team wins, 0 = away team
+    out.upsets = hw.filter((h, i) => h !== (pf[i] >= 0.5)).length;
     const won = D.teams.map(() => 0);
     for (const [, h, hs, a, as] of D.games) { if (h !== null && hs > as) won[h]++; if (a !== null && as > hs) won[a]++; }
     fut.forEach((g, i) => { const w = out.pick[i] ? g[1] : g[2]; if (w !== null) won[w]++; });
     out.teams.forEach((x, t) => { x.pw = won[t]; x.left = fut.filter(g => g[1] === t || g[2] === t).length; });
-    // Projected finish = the current-Top-25 formula applied to this one season (every favorite wins, by its
-    // predicted margin), so a team's projected rank always matches its projected W-L. The simulations above
+    // Projected finish = the current-Top-25 formula applied to this one projected season (favorites win by their
+    // predicted margin, upsets by 3), so a team's projected rank always matches its projected W-L. The simulations above
     // still supply the rank range, Top-25 odds and unbeaten odds.
     const games = D.games.slice();
     base.forEach((g, i) => {
       const hi = ix(g.h), ai = ix(g.a), homeWins = out.pick[i] === 1;
-      let m = Math.max(1, Math.round(Math.abs(g.mean))); if (!homeWins) m = -m;
+      const upset = homeWins !== (pf[i] >= 0.5); // favorite wins by its predicted margin, an upset by 3
+      let m = upset ? 3 : Math.max(1, Math.round(Math.abs(g.mean))); if (!homeWins) m = -m;
       const T = (av[hi].pf + av[ai].pa + av[ai].pf + av[hi].pa) / 2;
       let hs = Math.round((T + m) / 2), as = hs - m; if (as < 0) { hs -= as; as = 0; } if (hs < 0) { as -= hs; hs = 0; }
       const hy = +((av[hi].yf + av[ai].ya) / 2).toFixed(3), ay = +((av[ai].yf + av[hi].ya) / 2).toFixed(3);

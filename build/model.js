@@ -5,10 +5,12 @@
 // Predictive stats (yards per play, results vs the spread) moved to the projection (predict.js). The model can still
 // score ypp/ats if they are passed in W, but the default poll leaves them out.
 // v6 (Nov 2, 2026, Bob): quality 10->20, win % 35->30, upset losses 10->5, so a good record without good wins ranks lower.
-const DEFAULT_W = { wp: 0.30, owp: 0.25, oowp: 0.05, conf: 0.10, mov: 0.05, qual: 0.20, ups: 0.05 }; // sums to 1
+// v7 (Nov 2, 2026, Bob): short wins 5% replaces margin (margin kept at 0 so it can still be tuned on the page).
+const DEFAULT_W = { wp: 0.30, owp: 0.25, oowp: 0.05, conf: 0.10, mov: 0, qual: 0.20, ups: 0.05, cov: 0.05 }; // sums to 1
 // Upset losses: each loss costs max(0, 2p-1), p = the team's pregame win chance from its ESPN line (sigma 15).
 // Factor = 1 - (sum of penalties)/UPS_SCALE, floored at 0. No penalty for losing as an underdog or in a pick'em.
 const UPS_SCALE = 1.5, UPS_SIGMA = 15;
+const COV_CAP = 14, COV_SCALE = 4;
 const DEFAULT_FCS_WIN = 0.4;               // an FCS win counts as 0.4 of a game won (losses count in full)
 const FCS_WP = 0.30, FCS_CONF = 0.20, MOV_CAP = 24, ATS_CAP = 21, CONF_PRIOR = 4;
 
@@ -64,8 +66,13 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
   const PhiU = z => { const t = 1 / (1 + 0.3275911 * Math.abs(z / Math.SQRT2)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z / 2); return 0.5 * (1 + (z >= 0 ? y : -y)); };
   const UPSD = sched.map(s => { let pen = 0; const list = []; for (const g of s) { if (win(g) || g.opp === null || !g.line) continue; const p = PhiU(-g.line / UPS_SIGMA), v = Math.max(0, 2 * p - 1); if (v > 0) { pen += v; list.push([g.opp, g.line, Math.round(100 * v) / 100]); } } return { pen, list }; });
   const UPS = UPSD.map(x => Math.max(0, 1 - x.pen / UPS_SCALE));
-  const keys = ['wp', 'owp', 'oowp', 'conf', 'ats', 'mov', 'ypp', 'ups'].filter(k => W[k] != null);
-  const comp = t => ({ wp: WP[t], owp: OWP[t], oowp: OOWP[t], conf: OCONF[t], ats: ATS[t], mov: MOV[t], ypp: YPP[t], ups: UPS[t] });
+  // Short wins: winning as a favorite by less than the spread, with the spread capped at COV_CAP. Each such win costs
+  // (capped spread - margin) / COV_CAP: 0 for winning by 14+ (or by the full spread), up to ~1 for a 1-point win as a
+  // 14+ point favorite. Factor = 1 - (sum of costs)/COV_SCALE, floored at 0. Losses are handled by upset losses.
+  const COVD = sched.map(s => { let pen = 0; const list = []; for (const g of s) { if (!win(g) || g.opp === null || !(g.line < 0)) continue; const v = Math.max(0, Math.min(-g.line, COV_CAP) - (g.pf - g.pa)) / COV_CAP; if (v > 0) { pen += v; list.push([g.opp, g.line, g.pf - g.pa, Math.round(100 * v) / 100]); } } return { pen, list }; });
+  const COV = COVD.map(x => Math.max(0, 1 - x.pen / COV_SCALE));
+  const keys = ['wp', 'owp', 'oowp', 'conf', 'ats', 'mov', 'ypp', 'ups', 'cov'].filter(k => W[k] != null);
+  const comp = t => ({ wp: WP[t], owp: OWP[t], oowp: OOWP[t], conf: OCONF[t], ats: ATS[t], mov: MOV[t], ypp: YPP[t], ups: UPS[t], cov: COV[t] });
   const noQ = keys.reduce((s, k) => s + W[k], 0) || 1;
   const base = WP.map((_, t) => { const c = comp(t); return keys.reduce((s, k) => s + W[k] * c[k], 0) / noQ; });
   const baseRank = ranks(base);
@@ -88,7 +95,7 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
     t, abbr, name: D.names[t], conf: D.conf[t], w: wl[t][0], l: wl[t][1],
     fcsW: sched[t].filter(g => g.opp === null && win(g)).length,
     wp: WP[t], rawWP: rawWP[t], owp: OWP[t], oowp: OOWP[t], oconf: OCONF[t], mov: MOV[t], ats: ATS[t], atsRec: ATSR[t],
-    ups: UPS[t], upsList: UPSD[t].list, ypp: YPP[t], yOff: offA[t], yDef: defA[t], qual: QUAL[t], top25: QG[t].top25, bad: QG[t].bad, score: score[t],
+    ups: UPS[t], upsList: UPSD[t].list, cov: COV[t], covList: COVD[t].list, ypp: YPP[t], yOff: offA[t], yDef: defA[t], qual: QUAL[t], top25: QG[t].top25, bad: QG[t].bad, score: score[t],
     rank: rank[t], sosRank: sosRank[t], wlRank: wlRank[t], atsRank: atsRank[t]
   }));
 }

@@ -156,12 +156,12 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
   <section class="panel method">
     <h3>How the current Top 25 is built</h3>
     <ol>
-      <li><b>Win % (35%).</b> A win over an FCS team counts as 0.4 of a win here. A loss to an FCS team counts in full. The W-L column shows the real record; * marks teams with an FCS win.</li>
+      <li><b>Win % (30%).</b> A win over an FCS team counts as 0.4 of a win here. A loss to an FCS team counts in full. The W-L column shows the real record; * marks teams with an FCS win.</li>
       <li><b>Opponents' win % (25%).</b> Each opponent's record, with its game against you removed so your result doesn't inflate or deflate it.</li>
       <li><b>Opponents' opponents' win % (5%).</b> The average of your opponents' win %. This catches a 6-1 opponent whose wins came against nobody.</li>
       <li><b>Opponent conference strength (10%).</b> Each conference is rated by its non-conference record vs FBS teams (shrunk toward .500 early). You get the average rating of your opponents' conferences.</li>
-      <li><b>Quality results (10%).</b> Bonus for wins over teams rated top 10, 11–25 and 26–50; penalty for losses to teams rated 51+ and to FCS teams.</li>
-      <li><b>Upset losses (10%).</b> Extra cost for losing a game you were favored to win, scaled by the ESPN pregame line: nothing for losing as an underdog or in a pick'em, about 0.4 for losing as a 7.5-point favorite, 0.6 as a 13.5-point favorite, 0.8 as a 19.5-point favorite. Penalties add up; 1.5 points' worth of upset losses wipes out the factor.</li>
+      <li><b>Quality results (20%).</b> Bonus for wins over teams rated top 10, 11–25 and 26–50; penalty for losses to teams rated 51+ and to FCS teams.</li>
+      <li><b>Upset losses (5%).</b> Extra cost for losing a game you were favored to win, scaled by the ESPN pregame line: nothing for losing as an underdog or in a pick'em, about 0.4 for losing as a 7.5-point favorite, 0.6 as a 13.5-point favorite, 0.8 as a 19.5-point favorite. Penalties add up; 1.5 points' worth of upset losses wipes out the factor.</li>
       <li><b>Margin (5%).</b> Point differential per game, capped at 24 so running up the score earns nothing extra. FCS games are discounted.</li>
     </ol>
     <p>This poll rewards results only. Stats that mainly predict future games, like yards per play and results against the point spread, feed the projection instead. With these weights the higher-ranked team won 82% of the FBS games already played. FCS opponents are treated as a .300 team in a weak conference. SOS rank combines opponents' and opponents' opponents' win % at 2:1.</p>

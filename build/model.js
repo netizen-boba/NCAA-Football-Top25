@@ -4,7 +4,8 @@
 // v4 (Nov 2026): reactive / resume poll. Ranks what teams have earned: record, schedule, quality of wins and losses, margin.
 // Predictive stats (yards per play, results vs the spread) moved to the projection (predict.js). The model can still
 // score ypp/ats if they are passed in W, but the default poll leaves them out.
-const DEFAULT_W = { wp: 0.35, owp: 0.25, oowp: 0.05, conf: 0.10, mov: 0.05, qual: 0.10, ups: 0.10 }; // sums to 1
+// v6 (Nov 2, 2026, Bob): quality 10->20, win % 35->30, upset losses 10->5, so a good record without good wins ranks lower.
+const DEFAULT_W = { wp: 0.30, owp: 0.25, oowp: 0.05, conf: 0.10, mov: 0.05, qual: 0.20, ups: 0.05 }; // sums to 1
 // Upset losses: each loss costs max(0, 2p-1), p = the team's pregame win chance from its ESPN line (sigma 15).
 // Factor = 1 - (sum of penalties)/UPS_SCALE, floored at 0. No penalty for losing as an underdog or in a pick'em.
 const UPS_SCALE = 1.5, UPS_SIGMA = 15;

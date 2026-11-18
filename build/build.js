@@ -127,6 +127,23 @@ async function fetchPolls(idx) {
   } catch (e) { console.warn('Polls unavailable:', e.message); return []; }
 }
 
+// BCS-formula Top 25 (BCSKnowHow's weekly unofficial standings; ESPN doesn't carry it). Kept by hand in data/bcs.json:
+// { source, url, date, teams: [ESPN abbreviations, #1 first] }. Optional: a missing or bad file never blocks the build.
+function loadBCS(D) {
+  const f = path.join(ROOT, 'data', 'bcs.json');
+  try {
+    if (!fs.existsSync(f)) return null;
+    const b = JSON.parse(fs.readFileSync(f, 'utf8'));
+    const ranks = D.teams.map(() => null), miss = [];
+    b.teams.forEach((abbr, k) => { const i = D.teams.indexOf(abbr); if (i < 0) miss.push(abbr); else ranks[i] = k + 1; });
+    if (miss.length) console.warn('BCS: unknown team abbreviations ' + miss.join(', '));
+    const days = (Date.now() - Date.parse(b.date)) / 864e5;
+    console.log(`Poll BCS: ${b.date}, ${b.teams.length - miss.length}/${b.teams.length} teams matched` + (days > 9 ? ` (WARNING: ${Math.floor(days)} days old, update data/bcs.json)` : ''));
+    if (b.teams.length - miss.length < 20) { console.warn('BCS: too few teams matched, skipping'); return null; }
+    return { key: 'bcs', label: 'BCS', name: 'BCS formula (BCSKnowHow)', date: b.date, ranks };
+  } catch (e) { console.warn('BCS unavailable:', e.message); return null; }
+}
+
 function verify(D) {
   const wl = D.teams.map(() => [0, 0]);
   for (const [, h, hs, a, as] of D.games) { if (h !== null) wl[h][hs > as ? 0 : 1]++; if (a !== null) wl[a][as > hs ? 0 : 1]++; }
@@ -142,7 +159,8 @@ const fmtET = (d, opts) => new Date(d).toLocaleString('en-US', { timeZone: 'Amer
 // Header line naming the poll dates shown in the table. The CFP committee's first ranking comes out the first Tuesday of November.
 function pollMeta(polls, season) {
   const day = d => (d ? fmtET(d, { month: 'short', day: 'numeric' }) : '');
-  const parts = polls.map(p => `<span>${p.label} = ${p.key === 'ap' ? 'AP poll' : 'CFP committee'} of <b>${day(p.date)}</b></span>`);
+  const what = { ap: 'AP poll', cfp: 'CFP committee', bcs: 'BCS formula (BCSKnowHow)' };
+  const parts = polls.map(p => `<span>${p.label} = ${what[p.key] || p.name} of <b>${day(p.date)}</b></span>`);
   if (!polls.some(p => p.key === 'cfp')) {
     const t = new Date(Date.UTC(season, 10, 1)); t.setUTCDate(1 + ((9 - t.getUTCDay()) % 7)); // first Tuesday of November
     parts.push(`<span>CFP = committee rankings, first release <b>${t.toLocaleString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' })}</b></span>`);
@@ -188,6 +206,8 @@ function render(D) {
 (async () => {
   const i = process.argv.indexOf('--data');
   const D = i > 0 ? JSON.parse(fs.readFileSync(process.argv[i + 1], 'utf8')) : await fetchData();
+  const bcs = loadBCS(D);
+  D.polls = (D.polls || []).filter(p => p.key !== 'bcs').concat(bcs ? [bcs] : []);
   const v = verify(D);
   console.log(`Teams ${D.teams.length}, games ${D.games.length}, last game ${D.lastDate}, games missing yards/play ${v.noYpp}`);
   if (v.bad.length) { console.error('Check failed (records or conferences), not publishing:', JSON.stringify(v.bad.slice(0, 10))); process.exit(1); }

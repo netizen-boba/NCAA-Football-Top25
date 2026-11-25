@@ -100,6 +100,7 @@ async function fetchData() {
     Math.floor((Date.parse(g.date) - t0) / 864e5 / 7), g.h in idx ? idx[g.h] : null, g.a in idx ? idx[g.a] : null, g.neu, g.line ?? null, g.date]);
   console.log(`Remaining games ${D.future.length}, with posted lines ${D.future.filter(g => g[4] != null).length}`);
   D.polls = await fetchPolls(idx);
+  D.cfpFetched = await fetchCfpHistory(season, idx, fbs, (D.polls.find(p => p.key === 'cfp') || {}).id);
   return D;
 }
 
@@ -121,10 +122,49 @@ async function fetchPolls(idx) {
       for (const x of p.ranks) { const i = idx[x.team?.id]; if (i != null && x.current) { ranks[i] = x.current; hit++; } }
       console.log(`Poll ${label}: ${p.name}, ${p.date}, ${hit}/${p.ranks.length} teams matched`);
       if (hit < 20) { console.warn(`Poll ${label}: too few teams matched, skipping`); continue; }
-      out.push({ key, label, name: p.name, date: p.date || p.ranks[0]?.date || '', ranks });
+      out.push({ key, label, name: p.name, id: p.id, date: p.date || p.ranks[0]?.date || '', ranks });
     }
     return out;
   } catch (e) { console.warn('Polls unavailable:', e.message); return []; }
+}
+
+// Past CFP committee releases (the model uses the release in force for each week, so last week's ranks use last
+// week's release). Weekly rankings from ESPN's core API; optional, never blocks the build. Returns [{date, teams: [abbr]}].
+async function fetchCfpHistory(season, idx, fbs, cfpId) {
+  const out = [];
+  try {
+    const ids = cfpId ? [cfpId] : [21];
+    for (const id of ids) for (let w = 1; w <= 18; w++) {
+      const r = await getJSON(`${C}/seasons/${season}/types/2/weeks/${w}/rankings/${id}`).catch(() => null);
+      if (!r || !(r.ranks || []).length) continue;
+      if (!/playoff|cfp/i.test(`${r.name} ${r.shortName} ${r.type}`)) continue;
+      const teams = [];
+      for (const x of r.ranks) { const tid = (x.team?.$ref || '').match(/teams\/(\d+)/)?.[1]; if (tid in idx && x.current) teams[x.current - 1] = fbs[idx[tid]][1].abbr; }
+      if (teams.filter(Boolean).length >= 20) out.push({ date: r.date || r.ranks[0]?.date || '', teams });
+    }
+    console.log(`CFP history from ESPN: ${out.length} releases`);
+  } catch (e) { console.warn('CFP history unavailable:', e.message); }
+  return out;
+}
+
+// Merge CFP releases from ESPN's weekly history, the stored file and the current release; save the file; give the model
+// D.cfpHist = [{date, wk, ranks}] sorted oldest first (wk = season week the release came out in, same weeks as games).
+function buildCfpHist(D) {
+  const f = path.join(ROOT, 'data', 'cfp-history.json');
+  let hist = [];
+  try { if (fs.existsSync(f)) hist = JSON.parse(fs.readFileSync(f, 'utf8')).releases || []; } catch (e) { console.warn('cfp-history.json unreadable:', e.message); }
+  const cur = (D.polls || []).find(p => p.key === 'cfp');
+  const add = r => { if (!r || !r.date || !r.teams || r.teams.filter(Boolean).length < 20) return; const day = r.date.slice(0, 10); hist = hist.filter(h => h.date.slice(0, 10) !== day).concat([{ date: r.date, teams: r.teams }]); };
+  for (const r of D.cfpFetched || []) add(r);
+  if (cur) { const teams = []; cur.ranks.forEach((r, t) => { if (r) teams[r - 1] = D.teams[t]; }); add({ date: cur.date, teams }); }
+  hist.sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (hist.length) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify({ note: 'CFP committee releases, ESPN abbreviations, #1 first', releases: hist }, null, 1)); }
+  D.cfpHist = hist.map(h => {
+    const ranks = D.teams.map(() => null);
+    h.teams.forEach((a, k) => { const t = D.teams.indexOf(a); if (t >= 0) ranks[t] = k + 1; });
+    return { date: h.date, wk: Math.floor((Date.parse(h.date) - D.t0) / 864e5 / 7), ranks };
+  });
+  console.log('CFP releases used: ' + (D.cfpHist.map(h => h.date.slice(0, 10) + ' (wk ' + h.wk + ')').join(', ') || 'none'));
 }
 
 function verify(D) {
@@ -165,7 +205,7 @@ function render(D) {
     __POLLMETA__: pollMeta(D.polls || [], D.season),
   };
   let page = fs.readFileSync(path.join(__dirname, 'page.html'), 'utf8');
-  const data = { teams: D.teams, names: D.names, conf: D.conf, games: D.games, polls: (D.polls || []).map(p => ({ key: p.key, label: p.label, name: p.name, ranks: p.ranks })) };
+  const data = { teams: D.teams, names: D.names, conf: D.conf, games: D.games, polls: (D.polls || []).map(p => ({ key: p.key, label: p.label, name: p.name, ranks: p.ranks })), cfpHist: D.cfpHist || [] };
   if ((D.future || []).length) {
     const t = Date.now();
     data.future = D.future.map(g => g.slice(0, 5));
@@ -190,6 +230,7 @@ function render(D) {
   const i = process.argv.indexOf('--data');
   const D = i > 0 ? JSON.parse(fs.readFileSync(process.argv[i + 1], 'utf8')) : await fetchData();
   D.polls = (D.polls || []).filter(p => p.key !== 'bcs'); // BCS column removed at Bob's request (Nov 25, 2026)
+  buildCfpHist(D);
   const v = verify(D);
   console.log(`Teams ${D.teams.length}, games ${D.games.length}, last game ${D.lastDate}, games missing yards/play ${v.noYpp}`);
   if (v.bad.length) { console.error('Check failed (records or conferences), not publishing:', JSON.stringify(v.bad.slice(0, 10))); process.exit(1); }

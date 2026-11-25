@@ -6,7 +6,11 @@
 // score ypp/ats if they are passed in W, but the default poll leaves them out.
 // v6 (Nov 2, 2026, Bob): quality 10->20, win % 35->30, upset losses 10->5, so a good record without good wins ranks lower.
 // v7 (Nov 2, 2026, Bob): short wins 5% replaces margin (margin kept at 0 so it can still be tuned on the page).
-const DEFAULT_W = { wp: 0.30, owp: 0.25, oowp: 0.05, conf: 0.10, mov: 0, qual: 0.20, ups: 0.05, cov: 0.05 }; // sums to 1
+// v8 (Nov 25, 2026, Bob): CFP committee rankings count 20%; the other weights were scaled by 0.8 to make room.
+const DEFAULT_W = { wp: 0.24, owp: 0.20, oowp: 0.04, conf: 0.08, mov: 0, qual: 0.16, ups: 0.04, cov: 0.04, cfp: 0.20 }; // sums to 1
+// CFP factor: committee rank r -> (26 - r) / 25 (#1 = 1.0, #25 = 0.04); unranked = 0. Each snapshot uses the latest
+// release published by the end of that week (D.cfpHist: [{date, wk, ranks}], ranks[t] = rank or null). With no release
+// yet (before early November), the factor is left out and the other weights are scaled back up to 100%.
 // Upset losses: each loss costs max(0, 2p-1), p = the team's pregame win chance from its ESPN line (sigma 15).
 // Factor = 1 - (sum of penalties)/UPS_SCALE, floored at 0. No penalty for losing as an underdog or in a pick'em.
 const UPS_SCALE = 1.5, UPS_SIGMA = 15;
@@ -71,8 +75,13 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
   // 14+ point favorite. Factor = 1 - (sum of costs)/COV_SCALE, floored at 0. Losses are handled by upset losses.
   const COVD = sched.map(s => { let pen = 0; const list = []; for (const g of s) { if (!win(g) || g.opp === null || !(g.line < 0)) continue; const v = Math.max(0, Math.min(-g.line, COV_CAP) - (g.pf - g.pa)) / COV_CAP; if (v > 0) { pen += v; list.push([g.opp, g.line, g.pf - g.pa, Math.round(100 * v) / 100]); } } return { pen, list }; });
   const COV = COVD.map(x => Math.max(0, 1 - x.pen / COV_SCALE));
-  const keys = ['wp', 'owp', 'oowp', 'conf', 'ats', 'mov', 'ypp', 'ups', 'cov'].filter(k => W[k] != null);
-  const comp = t => ({ wp: WP[t], owp: OWP[t], oowp: OOWP[t], conf: OCONF[t], ats: ATS[t], mov: MOV[t], ypp: YPP[t], ups: UPS[t], cov: COV[t] });
+  const cfpRel = (D.cfpHist || []).filter(h => h.wk <= maxWeek).slice(-1)[0] || null;
+  const CFPR = D.teams.map((_, t) => (cfpRel ? cfpRel.ranks[t] || null : null));
+  const CFPV = CFPR.map(r => (r ? (26 - r) / 25 : 0));
+  const keys = ['wp', 'owp', 'oowp', 'conf', 'ats', 'mov', 'ypp', 'ups', 'cov', 'cfp'].filter(k => W[k] != null && (k !== 'cfp' || cfpRel));
+  const wAll = Object.values(W).reduce((s, v) => s + (v || 0), 0) || 1;
+  const rescale = cfpRel || !W.cfp ? 1 : wAll / (wAll - W.cfp);
+  const comp = t => ({ wp: WP[t], owp: OWP[t], oowp: OOWP[t], conf: OCONF[t], ats: ATS[t], mov: MOV[t], ypp: YPP[t], ups: UPS[t], cov: COV[t], cfp: CFPV[t] });
   const noQ = keys.reduce((s, k) => s + W[k], 0) || 1;
   const base = WP.map((_, t) => { const c = comp(t); return keys.reduce((s, k) => s + W[k] * c[k], 0) / noQ; });
   const baseRank = ranks(base);
@@ -86,7 +95,7 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
     return { q: wsum ? q / wsum : 0, top25, bad };
   });
   const QUAL = QG.map(x => Math.max(0, Math.min(1, (x.q + 1) / 2)));
-  const score = WP.map((_, t) => { const c = comp(t); return keys.reduce((s, k) => s + W[k] * c[k], 0) + W.qual * QUAL[t]; });
+  const score = WP.map((_, t) => { const c = comp(t); return rescale * (keys.reduce((s, k) => s + W[k] * c[k], 0) + (W.qual || 0) * QUAL[t]); });
   const rank = ranks(score);
   const sosRank = ranks(OWP.map((o, t) => (2 * o + OOWP[t]) / 3));
   const wlRank = ranks(wl.map(([w], t) => rawWP[t] * 1000 + w), true);
@@ -95,7 +104,7 @@ function rankModel(D, maxWeek, W, fcsWin, X) {
     t, abbr, name: D.names[t], conf: D.conf[t], w: wl[t][0], l: wl[t][1],
     fcsW: sched[t].filter(g => g.opp === null && win(g)).length,
     wp: WP[t], rawWP: rawWP[t], owp: OWP[t], oowp: OOWP[t], oconf: OCONF[t], mov: MOV[t], ats: ATS[t], atsRec: ATSR[t],
-    ups: UPS[t], upsList: UPSD[t].list, cov: COV[t], covList: COVD[t].list, ypp: YPP[t], yOff: offA[t], yDef: defA[t], qual: QUAL[t], top25: QG[t].top25, bad: QG[t].bad, score: score[t],
+    ups: UPS[t], upsList: UPSD[t].list, cov: COV[t], covList: COVD[t].list, cfpv: CFPV[t], cfpRank: CFPR[t], cfpDate: cfpRel ? cfpRel.date : null, ypp: YPP[t], yOff: offA[t], yDef: defA[t], qual: QUAL[t], top25: QG[t].top25, bad: QG[t].bad, score: score[t],
     rank: rank[t], sosRank: sosRank[t], wlRank: wlRank[t], atsRank: atsRank[t]
   }));
 }

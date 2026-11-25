@@ -110,7 +110,7 @@ function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
       games.push([g.w, g.h, hs, g.a, as, -g.mean, g.neu, 0, hy, ay]);
       if (g.h !== null) wl[g.h][hs > as ? 0 : 1]++; if (g.a !== null) wl[g.a][as > hs ? 0 : 1]++;
     }
-    const res = rankModel({ teams: D.teams, names: D.names, conf: D.conf, games }, 99);
+    const res = rankModel({ teams: D.teams, names: D.names, conf: D.conf, games, cfpHist: D.cfpHist }, 99);
     for (const r of res) {
       rankSum[r.t] += r.rank; hist[r.t][r.rank]++;
       if (r.rank <= 25) top25[r.t]++;
@@ -181,7 +181,7 @@ function simulate(D, nSims = 2000, o = P_DEFAULTS, seed = 20261) {
       const hy = +((av[hi].yf + av[ai].ya) / 2).toFixed(3), ay = +((av[ai].yf + av[hi].ya) / 2).toFixed(3);
       games.push([g.w, g.h, hs, g.a, as, -g.mean, g.neu, 0, hy, ay]);
     });
-    for (const r of rankModel({ teams: D.teams, names: D.names, conf: D.conf, games }, 99)) out.teams[r.t].projRank = r.rank;
+    for (const r of rankModel({ teams: D.teams, names: D.names, conf: D.conf, games, cfpHist: D.cfpHist }, 99)) out.teams[r.t].projRank = r.rank;
   }
   return out;
 }

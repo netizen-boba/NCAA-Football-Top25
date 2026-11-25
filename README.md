@@ -10,6 +10,4 @@ The build (`build/build.js`) pulls scores, box scores and spreads from ESPN, che
 ESPN's official standings, and only publishes if they all match. The table also shows the latest AP poll and College Football Playoff
 committee rankings from ESPN for comparison (they do not feed the model); the Wednesday run picks up Sunday's AP poll
 and Tuesday night's CFP release.
-The BCS column is BCSKnowHow's unofficial BCS-formula Top 25 (released Mondays; ESPN doesn't carry it). It's kept by hand in
-`data/bcs.json`: list the 25 teams in order by ESPN abbreviation (see `build/names.json`) and set `date`. The build warns in
-its log when the file is more than 9 days old. Run it by hand from the Actions tab ("Run workflow").
+Run it by hand from the Actions tab ("Run workflow").

@@ -86,6 +86,27 @@ sup.fcs{color:var(--pylon);font-size:11px;margin-left:1px}
 .compline{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:8px}
 .below{display:grid;grid-template-columns:1fr 1fr;gap:28px}
 @media (max-width:760px){.below{grid-template-columns:1fr}}
+.matchup{border-top:1.5px solid var(--rule-strong);padding-top:18px}
+.mu-form{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px 14px;align-items:end}
+.mu-team{display:grid;gap:4px;min-width:0}
+.mu-team label,.mu-lab{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mu-team select{font:600 15px var(--body);color:var(--ink);background:var(--sheet);border:1.5px solid var(--rule-strong);border-radius:4px;padding:8px 10px;width:100%;min-width:0}
+.mu-team select:focus-visible,.mu-site button:focus-visible{outline:2px solid var(--pylon);outline-offset:2px}
+.mu-vs{font:800 18px var(--display);text-transform:uppercase;color:var(--muted);padding-bottom:9px}
+.mu-site{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.mu-out{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px 28px;background:var(--sheet);border:1px solid var(--rule);padding:16px 18px;align-items:center}
+.mu-win{display:grid;gap:4px;min-width:0}
+.mu-win .k{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mu-win .n{font:900 clamp(30px,5vw,44px)/.95 var(--display);text-transform:uppercase;color:var(--ink)}
+.mu-win .p{font:600 15px var(--mono);color:var(--turf)}
+.mu-bar{display:flex;height:26px;border:1.5px solid var(--rule-strong);border-radius:3px;overflow:hidden;font:600 12px var(--mono)}
+.mu-bar span{display:flex;align-items:center;padding:0 8px;white-space:nowrap;overflow:hidden;min-width:0}
+.mu-bar .a{background:var(--turf);color:var(--sheet)}
+.mu-bar .b{background:var(--chip);color:var(--ink);justify-content:flex-end;flex:1}
+.mu-why{display:grid;gap:4px;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:10px}
+.mu-why b{color:var(--ink);font-weight:600}
+.mu-note{grid-column:1/-1;font-size:13px;color:var(--muted);border-top:1px dotted var(--rule);padding-top:10px}
+@media (max-width:640px){.mu-form{grid-template-columns:1fr}.mu-vs{padding:0}.mu-out{grid-template-columns:1fr}}
 .panel{display:grid;gap:12px;align-content:start;min-width:0}
 .panel p{margin:0;color:var(--muted);max-width:65ch}
 .chips{font-size:14px}
@@ -128,7 +149,7 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
   <div class="eyebrow">NCAA FBS · 138 teams · 2026 season</div>
   <h1>Bob's <span>Top 25</span></h1>
   <p class="sub">Two polls from one model. The current Top 25 ranks what each team has earned so far: won-lost record, how good its opponents were, conference strength, who it beat and who it lost to. The projected finish forecasts the rest of the season from predictive stats: yards per play, scoring margin and the betting market.</p>
-  <div class="meta"><span>Results through <b>Tue, Nov 24</b></span><span>Prev = through <b>Sun, Nov 22</b></span><span>Updated Wed, Nov 25, 6:51 AM ET</span><span>AP = AP poll of <b>Nov 22</b></span><span>CFP = CFP committee of <b>Nov 24</b></span></div>
+  <div class="meta"><span>Results through <b>Tue, Nov 24</b></span><span>Prev = through <b>Sun, Nov 22</b></span><span>Updated Wed, Nov 25, 6:56 AM ET</span><span>AP = AP poll of <b>Nov 22</b></span><span>CFP = CFP committee of <b>Nov 24</b></span></div>
 </header>
 
 <section style="display:grid;gap:12px">
@@ -148,6 +169,22 @@ input[type=range]{width:100%;accent-color:var(--pylon)}
   <div class="stripgrp"><span class="striplab">On the bubble</span><div class="outs" id="next"></div></div>
   <div class="stripgrp"><span class="striplab" id="dropLab">Dropped out</span><div class="outs" id="dropped"></div></div>
   <div id="pollouts" style="display:contents"></div>
+</section>
+
+<section class="panel matchup" id="matchup" hidden>
+  <div class="bar"><h2>Matchup predictor</h2></div>
+  <p>Pick any two FBS teams and where they play. The pick uses the same team ratings as the projected finish: points better than an average FBS team, from opponent-adjusted yards per play, scoring margin and past ESPN lines, plus home field.</p>
+  <div class="mu-form">
+    <div class="mu-team"><label for="muA">Team 1</label><select id="muA"></select></div>
+    <div class="mu-vs">vs</div>
+    <div class="mu-team"><label for="muB">Team 2</label><select id="muB"></select></div>
+    <div class="mu-site"><span class="mu-lab" id="muSiteLab">Where</span><div class="seg" role="group" aria-labelledby="muSiteLab">
+      <button type="button" id="muHomeA" aria-pressed="true">Team 1 home</button>
+      <button type="button" id="muNeutral" aria-pressed="false">Neutral</button>
+      <button type="button" id="muHomeB" aria-pressed="false">Team 2 home</button>
+    </div></div>
+  </div>
+  <div class="mu-out" id="muOut" aria-live="polite"></div>
 </section>
 
 <section class="panel tune">
@@ -459,6 +496,47 @@ document.getElementById('tbl').addEventListener('click',e=>{const th=e.target.cl
 document.getElementById('tbl').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const tr=e.target.closest('tr.trow');if(!tr)return;e.preventDefault();const t=+tr.dataset.t;open.has(t)?open.delete(t):open.add(t);render();const again=document.querySelector(`tr.trow[data-t="${t}"]`);again&&again.focus();});
 const VIEWS=[['vAdj','adj'],['vWL','wl'],['vProj','proj']];
 if(PROJ) document.getElementById('vProj').hidden=false;
+// Matchup predictor: same math as predict.js. Margin = rating A - rating B (+/- home field), win chance = Normal(margin, sigma).
+(function(){
+  if(!PROJ) return;
+  const sec=document.getElementById('matchup');sec.hidden=false;
+  const erf=x=>{const t=1/(1+0.3275911*Math.abs(x));const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;};
+  const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+  const A=document.getElementById('muA'),B=document.getElementById('muB'),out=document.getElementById('muOut');
+  const siteBtns={a:document.getElementById('muHomeA'),n:document.getElementById('muNeutral'),b:document.getElementById('muHomeB')};
+  let site='a';
+  const order=D.teams.map((_,t)=>t).sort((x,y)=>D.names[x].localeCompare(D.names[y]));
+  const opts=order.map(t=>`<option value="${t}">${D.names[t]}</option>`).join('');
+  A.innerHTML=opts;B.innerHTML=opts;
+  // Start on the current #1 vs #2
+  const {cur}=compute();const top=[...cur].sort((x,y)=>x.rank-y.rank);
+  A.value=top[0].t;B.value=top[1].t;
+  const sgn=x=>(x>0?'+':'')+x.toFixed(1);
+  function draw(){
+    const a=+A.value,b=+B.value;
+    for(const k in siteBtns)siteBtns[k].setAttribute('aria-pressed',k===site);
+    siteBtns.a.textContent=D.names[a]+' home';siteBtns.b.textContent=D.names[b]+' home';
+    if(a===b){out.innerHTML='<div class="mu-note">Pick two different teams.</div>';return;}
+    const ra=PROJ.teams[a].rating,rb=PROJ.teams[b].rating,hfa=PROJ.hfa;
+    const loc=site==='a'?hfa:site==='b'?-hfa:0;
+    const m=ra-rb+loc,pa=Phi(m/PROJ.sigma);
+    const win=pa>=0.5?a:b,pw=Math.max(pa,1-pa),mw=Math.abs(m);
+    const placeA=site==='a'?'at home':site==='b'?'on the road':'on a neutral field';
+    // A scheduled meeting this season, if any, with ESPN's posted line
+    let note='';
+    const gi=FUT.findIndex(g=>(g[1]===a&&g[2]===b)||(g[1]===b&&g[2]===a));
+    if(gi>=0){const [w,h,aw,neu,line]=FUT[gi];const hn=D.names[h],an=D.names[aw];
+      const where=neu?`${an} vs ${hn} (neutral site)`:`${an} at ${hn}`;
+      note=`<div class="mu-note">These teams meet this season: ${where}.`+(line!=null?` ESPN line: ${line<0?hn+' by '+(-line):line>0?an+' by '+line:'pick’em'}, which puts ${hn}’s chance at ${Math.round(PROJ.future[gi]*100)}%. The projected finish uses the line for that game.`:' No ESPN line is posted yet; the projected finish uses this same rating math.')+`</div>`;}
+    out.innerHTML=`<div class="mu-win"><span class="k">Projected winner</span><span class="n">${D.names[win]}</span><span class="p">${pctTxt(pw)} to win · by ${mw<0.05?'0':mw.toFixed(1)} pts</span></div>
+      <div><div class="mu-bar" role="img" aria-label="${D.names[a]} ${pctTxt(pa)}, ${D.names[b]} ${pctTxt(1-pa)}"><span class="a" style="width:${(pa*100).toFixed(1)}%">${pa>=0.12?D.names[a]+' '+pctTxt(pa):''}</span><span class="b">${1-pa>=0.12?D.names[b]+' '+pctTxt(1-pa):''}</span></div>
+      <div class="mu-why"><span><b>${D.names[a]}</b> rating ${sgn(ra)} pts (#${PROJ.teams[a].ratingRank})</span><span><b>${D.names[b]}</b> rating ${sgn(rb)} pts (#${PROJ.teams[b].ratingRank})</span><span>Home field ${site==='n'?'none (neutral site)':sgn(hfa)+' pts for '+D.names[site==='a'?a:b]} · ${D.names[a]} ${placeA}</span><span>Predicted margin: ${D.names[a]} ${sgn(m)} · real margins land within ${PROJ.sigma} pts of the prediction about 2 times in 3</span></div></div>${note}`;
+  }
+  A.addEventListener('change',draw);B.addEventListener('change',draw);
+  for(const k in siteBtns)siteBtns[k].addEventListener('click',()=>{site=k;draw();});
+  draw();
+})();
+
 for(const [id,v] of VIEWS) document.getElementById(id).addEventListener('click',()=>{view=v;sortCol='rk';sortDir=1;for(const [i2,v2] of VIEWS)document.getElementById(i2).setAttribute('aria-pressed',v===v2);render();});
 document.getElementById('reset').addEventListener('click',()=>{W={...DEFAULT_W};FCSW=DEFAULT_FCS_WIN;renderWeights();render();});
 renderWeights();renderConf();render();
